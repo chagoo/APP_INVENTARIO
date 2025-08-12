@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Nuevo Usuario' if modo=='nuevo' else 'Editar Usuario' }}{% endblock %}
+{% block content %}
+<h2 class="h5 mb-3">{{ 'Nuevo Usuario' if modo=='nuevo' else 'Editar Usuario' }}</h2>
+<form method="POST" class="row g-3" autocomplete="off">
+  {{ form.csrf_token }}
+  {% if modo=='nuevo' %}
+    <div class="col-md-6">{{ form.username.label(class='form-label') }} {{ form.username(class='form-control') }}{% for e in form.username.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+  {% else %}
+    <div class="col-md-6"><label class="form-label">Usuario</label><input class="form-control" value="{{ usuario.username }}" disabled></div>
+  {% endif %}
+  <div class="col-md-6">{{ form.role.label(class='form-label') }} {{ form.role(class='form-select') }}{% for e in form.role.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+  <div class="col-md-6">{{ form.password.label(class='form-label') }} {{ form.password(class='form-control', placeholder=modo=='editar' and 'Dejar vacío para no cambiar' or '') }}{% for e in form.password.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+  <div class="col-md-6">{{ form.confirm.label(class='form-label') }} {{ form.confirm(class='form-control') }}{% for e in form.confirm.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+  <div class="col-12 d-flex gap-2 pt-2">
+    <button class="btn btn-primary" type="submit">Guardar</button>
+    <a href="{{ url_for('web.usuarios_listar') }}" class="btn btn-secondary">Volver</a>
+  </div>
+</form>
+{% endblock %}

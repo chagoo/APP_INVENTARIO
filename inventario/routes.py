@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_user, logout_user, login_required, current_user
 from . import db, csrf
 from .models import Inventario, User
-from .forms import InventarioForm, SearchForm, LoginForm
+from .forms import InventarioForm, SearchForm, LoginForm, UserCreateForm, UserEditForm
 from io import StringIO, BytesIO
 import csv
 from datetime import datetime
@@ -138,6 +138,51 @@ def inventario_cerrar(item_id):
     db.session.commit()
     flash('Reporte cerrado','success')
     return redirect(url_for('web.inventario_listar'))
+
+@web_bp.route('/usuarios')
+@roles_required('admin')
+def usuarios_listar():
+    usuarios = User.query.order_by(User.username).all()
+    return render_template('users_list.html', usuarios=usuarios)
+
+@web_bp.route('/usuarios/nuevo', methods=['GET','POST'])
+@roles_required('admin')
+def usuarios_nuevo():
+    form = UserCreateForm()
+    if form.validate_on_submit():
+        u = User(username=form.username.data, role=form.role.data)
+        u.set_password(form.password.data)
+        db.session.add(u)
+        db.session.commit()
+        flash('Usuario creado','success')
+        return redirect(url_for('web.usuarios_listar'))
+    return render_template('user_form.html', form=form, modo='nuevo')
+
+@web_bp.route('/usuarios/<int:user_id>/editar', methods=['GET','POST'])
+@roles_required('admin')
+def usuarios_editar(user_id):
+    u = User.query.get_or_404(user_id)
+    form = UserEditForm(role=u.role)
+    if form.validate_on_submit():
+        u.role = form.role.data
+        if form.password.data:
+            u.set_password(form.password.data)
+        db.session.commit()
+        flash('Usuario actualizado','success')
+        return redirect(url_for('web.usuarios_listar'))
+    return render_template('user_form.html', form=form, modo='editar', usuario=u)
+
+@web_bp.route('/usuarios/<int:user_id>/eliminar', methods=['POST'])
+@roles_required('admin')
+def usuarios_eliminar(user_id):
+    u = User.query.get_or_404(user_id)
+    if u.username == 'admin' and User.query.filter_by(role='admin').count() == 1:
+        flash('No se puede eliminar el último admin','warning')
+        return redirect(url_for('web.usuarios_listar'))
+    db.session.delete(u)
+    db.session.commit()
+    flash('Usuario eliminado','success')
+    return redirect(url_for('web.usuarios_listar'))
 
 @web_bp.route('/inventario/csv')
 @roles_required('admin')
