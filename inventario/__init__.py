@@ -16,6 +16,7 @@ def create_app(test_config=None):
     db_path = os.path.join(Path(__file__).parent, 'data.sqlite')
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['API_TOKEN'] = os.environ.get('API_TOKEN')
 
     if test_config:
         app.config.update(test_config)

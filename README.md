@@ -2,11 +2,13 @@
 
 Aplicación Flask responsive (móvil, tablet y escritorio) para registrar el estado de equipos y generar reportes.
 
+Campos obligatorios: **región**, **local** y **farmacia**.
+
 ## Funcionalidades
-- CRUD básico (crear y listar, cierre de reporte)
+- CRUD completo (crear, listar, editar, eliminar y cerrar reportes)
 - Búsqueda por local
 - Exportación CSV
-- API REST JSON para integración móvil / apps externas
+- API REST JSON para integración móvil / apps externas (requiere header `X-API-KEY` para operaciones de escritura)
 - PWA: manifest + service worker (cache básico offline)
 
 ## Requisitos
@@ -15,14 +17,15 @@ Python 3.10+
 ## Instalación
 ```bash
 pip install -r requirements.txt
+export API_TOKEN="mi-token"  # opcional, requerido para API de escritura
 python app.py
 ```
 Abrir: http://localhost:5000
 
 ## Endpoints API
 GET /api/inventario?search=
-POST /api/inventario (JSON)
-POST /api/inventario/<id>/cerrar
+POST /api/inventario (JSON, requiere `X-API-KEY`)
+POST /api/inventario/<id>/cerrar (requiere `X-API-KEY`)
 
 Ejemplo POST JSON:
 ```json
@@ -52,8 +55,7 @@ Ejemplo POST JSON:
 Instalable en Android/Chrome. Íconos vacíos de ejemplo: reemplazar en `static/icons/`.
 
 ## Próximos pasos sugeridos
-- Autenticación (roles)
-- Editar registros
-- Validaciones adicionales
+- Autenticación con roles
+- Validaciones adicionales (longitud de campos, rangos numéricos)
 - Tests automatizados
 - Cache más granular y estrategia background sync

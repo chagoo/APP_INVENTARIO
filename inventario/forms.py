@@ -12,8 +12,8 @@ class SearchForm(FlaskForm):
 class InventarioForm(FlaskForm):
     region = StringField('Región', validators=[DataRequired()])
     distrito = StringField('Distrito')
-    local = StringField('Local')
-    farmacia = StringField('Farmacia')
+    local = StringField('Local', validators=[DataRequired()])
+    farmacia = StringField('Farmacia', validators=[DataRequired()])
     puntos_venta = IntegerField('Pts Venta', validators=[Optional()])
     puntos_falla = IntegerField('Pts Falla', validators=[Optional()])
     monitor_cliente = SelectField('Monitor Cliente', choices=COMMON_CHOICES)
