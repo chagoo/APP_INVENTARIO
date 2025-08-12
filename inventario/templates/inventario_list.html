@@ -14,7 +14,7 @@
 <div class="table-responsive">
   <table class="table table-sm table-striped align-middle small">
     <thead><tr>
-      <th>ID</th><th>Región</th><th>Distrito</th><th>Local</th><th>Farmacia</th><th>Pts Vta</th><th>Pts Falla</th><th>Cte</th><th>Asesor</th><th>Tecl</th><th>Esc</th><th>Mouse</th><th>Tecl PCM</th><th>UPS</th><th>Red</th><th>PinPad</th><th>Estado</th><th>Solución</th><th>Comentarios</th><th></th><th>Registro</th>
+      <th>ID</th><th>Región</th><th>Distrito</th><th>Local</th><th>Farmacia</th><th>Pts Vta</th><th>Pts Falla</th><th>Cte</th><th>Asesor</th><th>Tecl</th><th>Esc</th><th>Mouse</th><th>Tecl PCM</th><th>UPS</th><th>Red</th><th>PinPad</th><th>Estado</th><th>Solución</th><th>Comentarios</th><th>Acciones</th><th>Registro</th>
     </tr></thead>
     <tbody>
       {% for item in inventario %}
@@ -39,12 +39,19 @@
         <td>{{ item.fecha_solucion.strftime('%Y-%m-%d') if item.fecha_solucion else '' }}</td>
         <td style="max-width:200px">{{ item.comentarios }}</td>
         <td>
-          {% if item.estado_reporte != 'Cerrado' %}
-          <form method="POST" action="{{ url_for('web.inventario_cerrar', item_id=item.id) }}">
-            {{ form.csrf_token }}
-            <button class="btn btn-outline-success btn-sm">Cerrar</button>
-          </form>
-          {% endif %}
+          <div class="d-flex gap-1">
+            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('web.inventario_editar', item_id=item.id) }}">Editar</a>
+            <form method="POST" action="{{ url_for('web.inventario_eliminar', item_id=item.id) }}" onsubmit="return confirm('¿Eliminar registro?');">
+              {{ form.csrf_token }}
+              <button class="btn btn-outline-danger btn-sm">Eliminar</button>
+            </form>
+            {% if item.estado_reporte != 'Cerrado' %}
+            <form method="POST" action="{{ url_for('web.inventario_cerrar', item_id=item.id) }}">
+              {{ form.csrf_token }}
+              <button class="btn btn-outline-success btn-sm">Cerrar</button>
+            </form>
+            {% endif %}
+          </div>
         </td>
         <td>{{ item.fecha_registro.strftime('%Y-%m-%d %H:%M') if item.fecha_registro else '' }}</td>
       </tr>

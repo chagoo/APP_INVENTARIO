@@ -5,9 +5,20 @@ from .forms import InventarioForm, SearchForm
 from io import StringIO
 import csv
 from datetime import datetime
+from functools import wraps
 
 web_bp = Blueprint('web', __name__)
 api_bp = Blueprint('api', __name__)
+
+
+def require_api_token(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        token = current_app.config.get('API_TOKEN')
+        if token and request.headers.get('X-API-KEY') != token:
+            return jsonify({'error': 'unauthorized'}), 401
+        return view(*args, **kwargs)
+    return wrapped
 
 @web_bp.route('/')
 def index():
@@ -42,6 +53,27 @@ def inventario_nuevo():
         flash('Inventario guardado','success')
         return redirect(url_for('web.inventario_listar'))
     return render_template('inventario_form.html', form=form)
+
+
+@web_bp.route('/inventario/<int:item_id>/editar', methods=['GET', 'POST'])
+def inventario_editar(item_id):
+    item = Inventario.query.get_or_404(item_id)
+    form = InventarioForm(obj=item)
+    if form.validate_on_submit():
+        form.populate_obj(item)
+        db.session.commit()
+        flash('Inventario actualizado', 'success')
+        return redirect(url_for('web.inventario_listar'))
+    return render_template('inventario_form.html', form=form)
+
+
+@web_bp.route('/inventario/<int:item_id>/eliminar', methods=['POST'])
+def inventario_eliminar(item_id):
+    item = Inventario.query.get_or_404(item_id)
+    db.session.delete(item)
+    db.session.commit()
+    flash('Inventario eliminado', 'success')
+    return redirect(url_for('web.inventario_listar'))
 
 @web_bp.route('/inventario', methods=['GET','POST'])
 def inventario_listar():
@@ -96,7 +128,8 @@ def api_inventario_list():
     return jsonify(data)
 
 @api_bp.route('/inventario', methods=['POST'])
-@csrf.exempt  # could use token via header for mobile; keep simple
+@csrf.exempt
+@require_api_token
 def api_inventario_create():
     payload = request.get_json() or {}
     item = Inventario(
@@ -125,6 +158,7 @@ def api_inventario_create():
 
 @api_bp.route('/inventario/<int:item_id>/cerrar', methods=['POST'])
 @csrf.exempt
+@require_api_token
 def api_inventario_close(item_id):
     item = Inventario.query.get_or_404(item_id)
     item.estado_reporte = 'Cerrado'
