@@ -35,6 +35,19 @@ def create_app(test_config=None):
 
     with app.app_context():
         db.create_all()
+        # Seed default admin if no users exist
+        from .models import User
+        if User.query.count() == 0:
+            default_user = os.environ.get('ADMIN_USER', 'admin')
+            default_pass = os.environ.get('ADMIN_PASS', 'admin')
+            u = User(username=default_user, role='admin')
+            u.set_password(default_pass)
+            db.session.add(u)
+            db.session.commit()
+            app.logger.info(f"Usuario admin creado: {default_user} (cambia la contraseña ASAP)")
+
+    # Registrar comandos CLI
+    register_cli(app)
 
     return app
 
@@ -43,3 +56,25 @@ def create_app(test_config=None):
 def load_user(user_id):
     from .models import User
     return User.query.get(int(user_id))
+
+# Flask CLI commands
+def register_cli(app):
+    @app.cli.command('create-user')
+    def create_user_command():
+        """Crear un usuario interactivo"""
+        from .models import User
+        import getpass
+        username = input('Username: ').strip()
+        role = input('Role [admin/user] (default user): ').strip() or 'user'
+        password = getpass.getpass('Password: ')
+        if not username or not password:
+            print('Username y password requeridos')
+            return
+        if User.query.filter_by(username=username).first():
+            print('Usuario ya existe')
+            return
+        u = User(username=username, role=role)
+        u.set_password(password)
+        db.session.add(u)
+        db.session.commit()
+        print('Usuario creado')

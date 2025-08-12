@@ -3,7 +3,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from . import db, csrf
 from .models import Inventario, User
 from .forms import InventarioForm, SearchForm, LoginForm
-from io import StringIO
+from io import StringIO, BytesIO
 import csv
 from datetime import datetime
 from functools import wraps
@@ -142,6 +142,7 @@ def inventario_cerrar(item_id):
 @web_bp.route('/inventario/csv')
 @roles_required('admin')
 def inventario_csv():
+    """Genera y entrega el CSV en binario (compatibilidad Excel)."""
     si = StringIO()
     writer = csv.writer(si)
     header = ['id','region','distrito','local','farmacia','puntos_venta','puntos_falla','monitor_cliente','monitor_asesor','teclado','escaner','mouse_pcm','teclado_pcm','ups','red_lenta','pinpad','estado_reporte','fecha_solucion','comentarios','fecha_registro']
@@ -150,9 +151,11 @@ def inventario_csv():
         writer.writerow([
             item.id,item.region,item.distrito,item.local,item.farmacia,item.puntos_venta,item.puntos_falla,item.monitor_cliente,item.monitor_asesor,item.teclado,item.escaner,item.mouse_pcm,item.teclado_pcm,item.ups,item.red_lenta,item.pinpad,item.estado_reporte,item.fecha_solucion,item.comentarios,item.fecha_registro
         ])
-    output = StringIO(si.getvalue())
+    csv_text = si.getvalue()
+    # Agregamos BOM UTF-8 para que Excel en Windows reconozca acentos correctamente
+    output = BytesIO(('\ufeff' + csv_text).encode('utf-8'))
     output.seek(0)
-    return send_file(output, mimetype='text/csv', as_attachment=True, download_name='inventario.csv')
+    return send_file(output, mimetype='text/csv; charset=utf-8', as_attachment=True, download_name='inventario.csv')
 
 # API endpoints (JSON) for mobile / PWA usage
 @api_bp.route('/inventario', methods=['GET'])
