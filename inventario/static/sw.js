@@ -16,11 +16,24 @@ self.addEventListener('activate', evt => {
 self.addEventListener('fetch', evt => {
   const req = evt.request;
   if (req.method !== 'GET') return;
+
+  const accept = req.headers.get('accept') || '';
+
+  // Always try the network first for navigation requests (HTML)
+  // so that dynamic pages like forms include a fresh CSRF token.
+  if (req.mode === 'navigate' || accept.includes('text/html')) {
+    evt.respondWith(
+      fetch(req).catch(() => caches.match('/'))
+    );
+    return;
+  }
+
+  // Cache-first strategy for static assets
   evt.respondWith(
     caches.match(req).then(cached => cached || fetch(req).then(res => {
       const copy = res.clone();
       caches.open(CACHE_NAME).then(c => c.put(req, copy));
       return res;
-    }).catch(()=>caches.match('/')))
+    }))
   );
 });
