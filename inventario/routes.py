@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file, current_app, make_response
+from flask_login import login_user, logout_user, login_required, current_user
 from . import db, csrf
-from .models import Inventario
-from .forms import InventarioForm, SearchForm
+from .models import Inventario, User
+from .forms import InventarioForm, SearchForm, LoginForm
 from io import StringIO
 import csv
 from datetime import datetime
@@ -20,11 +21,43 @@ def require_api_token(view):
         return view(*args, **kwargs)
     return wrapped
 
+
+def roles_required(*roles):
+    def decorator(view):
+        @wraps(view)
+        @login_required
+        def wrapped(*args, **kwargs):
+            if current_user.role not in roles:
+                return "Forbidden", 403
+            return view(*args, **kwargs)
+        return wrapped
+    return decorator
+
 @web_bp.route('/')
 def index():
     return render_template('index.html')
 
+
+@web_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(username=form.username.data).first()
+        if user and user.check_password(form.password.data):
+            login_user(user)
+            return redirect(url_for('web.index'))
+        flash('Credenciales inválidas', 'danger')
+    return render_template('login.html', form=form)
+
+
+@web_bp.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('web.index'))
+
 @web_bp.route('/inventario/nuevo', methods=['GET','POST'])
+@roles_required('admin')
 def inventario_nuevo():
     form = InventarioForm()
     if form.validate_on_submit():
@@ -56,6 +89,7 @@ def inventario_nuevo():
 
 
 @web_bp.route('/inventario/<int:item_id>/editar', methods=['GET', 'POST'])
+@roles_required('admin')
 def inventario_editar(item_id):
     item = Inventario.query.get_or_404(item_id)
     form = InventarioForm(obj=item)
@@ -68,6 +102,7 @@ def inventario_editar(item_id):
 
 
 @web_bp.route('/inventario/<int:item_id>/eliminar', methods=['POST'])
+@roles_required('admin')
 def inventario_eliminar(item_id):
     item = Inventario.query.get_or_404(item_id)
     db.session.delete(item)
@@ -94,6 +129,7 @@ def inventario_listar():
                            filtro_local=filtro_local)
 
 @web_bp.route('/inventario/<int:item_id>/cerrar', methods=['POST'])
+@roles_required('admin')
 def inventario_cerrar(item_id):
     item = Inventario.query.get_or_404(item_id)
     item.estado_reporte = 'Cerrado'
@@ -104,6 +140,7 @@ def inventario_cerrar(item_id):
     return redirect(url_for('web.inventario_listar'))
 
 @web_bp.route('/inventario/csv')
+@roles_required('admin')
 def inventario_csv():
     si = StringIO()
     writer = csv.writer(si)

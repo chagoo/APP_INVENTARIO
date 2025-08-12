@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, IntegerField, TextAreaField, SelectField, DateField, SubmitField
+from wtforms import StringField, IntegerField, TextAreaField, SelectField, DateField, SubmitField, PasswordField
 from wtforms.validators import DataRequired, Optional
 
 COMMON_CHOICES = [('NO','NO'),('SÍ','SÍ')]
@@ -29,3 +29,9 @@ class InventarioForm(FlaskForm):
     estado_reporte = SelectField('Estado', choices=STATE_CHOICES)
     fecha_solucion = DateField('Fecha Solución', validators=[Optional()])
     submit = SubmitField('Guardar')
+
+
+class LoginForm(FlaskForm):
+    username = StringField('Usuario', validators=[DataRequired()])
+    password = PasswordField('Contraseña', validators=[DataRequired()])
+    submit = SubmitField('Ingresar')
