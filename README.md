@@ -22,6 +22,23 @@ python app.py
 ```
 Abrir: http://localhost:5000
 
+Al iniciarse por primera vez se crea automáticamente un usuario admin con credenciales:
+
+Usuario: admin
+Password: admin
+
+(Cámbialo cuanto antes creando otro usuario y eliminando/actualizando éste.)
+
+Para crear usuarios adicionales (en Linux/macOS) usa:
+```bash
+flask --app app create-user
+```
+En Windows PowerShell:
+```powershell
+flask --app app create-user
+```
+Se solicitarán username, rol (admin/user) y password.
+
 ## Endpoints API
 GET /api/inventario?search=
 POST /api/inventario (JSON, requiere `X-API-KEY`)
@@ -55,7 +72,7 @@ Ejemplo POST JSON:
 Instalable en Android/Chrome. Íconos vacíos de ejemplo: reemplazar en `static/icons/`.
 
 ## Próximos pasos sugeridos
-- Autenticación con roles
+- Fortalecer autenticación (expiración de sesión, forzar cambio primera vez)
 - Validaciones adicionales (longitud de campos, rangos numéricos)
 - Tests automatizados
 - Cache más granular y estrategia background sync
