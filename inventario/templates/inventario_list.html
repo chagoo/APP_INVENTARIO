@@ -3,7 +3,7 @@
 {% block content %}
 <h2 class="h4 mb-3">Inventario</h2>
 <form class="row g-2 mb-3" method="POST" action="{{ url_for('web.inventario_listar') }}">
-  {{ form.csrf_token }}
+  {{ form.hidden_tag() }}
   <div class="col-auto flex-grow-1">{{ form.search(class='form-control form-control-sm', placeholder='Buscar local', value=filtro_local) }}</div>
   <div class="col-auto"><button class="btn btn-primary btn-sm" type="submit">Buscar</button></div>
   <div class="col-auto"><a class="btn btn-secondary btn-sm" href="{{ url_for('web.inventario_listar') }}">Limpiar</a></div>
@@ -42,12 +42,12 @@
           <div class="d-flex gap-1">
             <a class="btn btn-outline-primary btn-sm" href="{{ url_for('web.inventario_editar', item_id=item.id) }}">Editar</a>
             <form method="POST" action="{{ url_for('web.inventario_eliminar', item_id=item.id) }}" onsubmit="return confirm('¿Eliminar registro?');">
-              {{ form.csrf_token }}
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-outline-danger btn-sm">Eliminar</button>
             </form>
             {% if item.estado_reporte != 'Cerrado' %}
             <form method="POST" action="{{ url_for('web.inventario_cerrar', item_id=item.id) }}">
-              {{ form.csrf_token }}
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-outline-success btn-sm">Cerrar</button>
             </form>
             {% endif %}

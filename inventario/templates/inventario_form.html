@@ -3,7 +3,7 @@
 {% block content %}
 <h2 class="h4 mb-3">Nuevo Registro</h2>
 <form method="POST" class="row g-3">
-  {{ form.csrf_token }}
+  {{ form.hidden_tag() }}
   <div class="col-sm-6">{{ form.region.label(class='form-label') }} {{ form.region(class='form-control', placeholder='Región') }}</div>
   <div class="col-sm-6">{{ form.distrito.label(class='form-label') }} {{ form.distrito(class='form-control') }}</div>
   <div class="col-sm-6">{{ form.local.label(class='form-label') }} {{ form.local(class='form-control') }}</div>
