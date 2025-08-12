@@ -2,11 +2,13 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
 from flask_cors import CORS
+from flask_login import LoginManager
 from pathlib import Path
 import os
 
 db = SQLAlchemy()
 csrf = CSRFProtect()
+login_manager = LoginManager()
 
 
 def create_app(test_config=None):
@@ -24,6 +26,8 @@ def create_app(test_config=None):
     CORS(app)
     db.init_app(app)
     csrf.init_app(app)
+    login_manager.init_app(app)
+    login_manager.login_view = 'web.login'
 
     from .routes import web_bp, api_bp
     app.register_blueprint(web_bp)
@@ -33,3 +37,9 @@ def create_app(test_config=None):
         db.create_all()
 
     return app
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    from .models import User
+    return User.query.get(int(user_id))
