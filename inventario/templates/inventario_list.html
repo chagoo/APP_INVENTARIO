@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Listado Inventario{% endblock %}
+{% block content %}
+<h2 class="h4 mb-3">Inventario</h2>
+<form class="row g-2 mb-3" method="POST" action="{{ url_for('web.inventario_listar') }}">
+  {{ form.csrf_token }}
+  <div class="col-auto flex-grow-1">{{ form.search(class='form-control form-control-sm', placeholder='Buscar local', value=filtro_local) }}</div>
+  <div class="col-auto"><button class="btn btn-primary btn-sm" type="submit">Buscar</button></div>
+  <div class="col-auto"><a class="btn btn-secondary btn-sm" href="{{ url_for('web.inventario_listar') }}">Limpiar</a></div>
+  <div class="col-auto"><a class="btn btn-outline-secondary btn-sm" href="{{ url_for('web.inventario_csv') }}">CSV</a></div>
+  <div class="col-auto"><a class="btn btn-success btn-sm" href="{{ url_for('web.inventario_nuevo') }}">Nuevo</a></div>
+</form>
+{% if inventario %}
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle small">
+    <thead><tr>
+      <th>ID</th><th>Región</th><th>Distrito</th><th>Local</th><th>Farmacia</th><th>Pts Vta</th><th>Pts Falla</th><th>Cte</th><th>Asesor</th><th>Tecl</th><th>Esc</th><th>Mouse</th><th>Tecl PCM</th><th>UPS</th><th>Red</th><th>PinPad</th><th>Estado</th><th>Solución</th><th>Comentarios</th><th></th><th>Registro</th>
+    </tr></thead>
+    <tbody>
+      {% for item in inventario %}
+      <tr>
+        <td>{{ item.id }}</td>
+        <td>{{ item.region }}</td>
+        <td>{{ item.distrito }}</td>
+        <td>{{ item.local }}</td>
+        <td>{{ item.farmacia }}</td>
+        <td>{{ item.puntos_venta }}</td>
+        <td>{{ item.puntos_falla }}</td>
+        <td>{{ item.monitor_cliente }}</td>
+        <td>{{ item.monitor_asesor }}</td>
+        <td>{{ item.teclado }}</td>
+        <td>{{ item.escaner }}</td>
+        <td>{{ item.mouse_pcm }}</td>
+        <td>{{ item.teclado_pcm }}</td>
+        <td>{{ item.ups }}</td>
+        <td>{{ item.red_lenta }}</td>
+        <td>{{ item.pinpad }}</td>
+        <td>{{ item.estado_reporte }}</td>
+        <td>{{ item.fecha_solucion.strftime('%Y-%m-%d') if item.fecha_solucion else '' }}</td>
+        <td style="max-width:200px">{{ item.comentarios }}</td>
+        <td>
+          {% if item.estado_reporte != 'Cerrado' %}
+          <form method="POST" action="{{ url_for('web.inventario_cerrar', item_id=item.id) }}">
+            {{ form.csrf_token }}
+            <button class="btn btn-outline-success btn-sm">Cerrar</button>
+          </form>
+          {% endif %}
+        </td>
+        <td>{{ item.fecha_registro.strftime('%Y-%m-%d %H:%M') if item.fecha_registro else '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="d-flex justify-content-between py-2">
+  {% if prev_page %}<a class="btn btn-outline-secondary btn-sm" href="{{ url_for('web.inventario_listar', page=prev_page, search=filtro_local) }}">&laquo; Ant</a>{% else %}<span></span>{% endif %}
+  {% if next_page %}<a class="btn btn-outline-secondary btn-sm" href="{{ url_for('web.inventario_listar', page=next_page, search=filtro_local) }}">Sig &raquo;</a>{% endif %}
+</div>
+{% else %}
+<div class="alert alert-info">Sin registros.</div>
+{% endif %}
+{% endblock %}

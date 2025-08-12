@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block title %}Inicio{% endblock %}
+{% block content %}
+<div class="text-center py-5">
+  <h1 class="display-6 mb-3">Inventario de Equipos</h1>
+  <p class="lead">Registra y consulta el estado de los equipos desde tu móvil, tablet o navegador.</p>
+  <a href="{{ url_for('web.inventario_nuevo') }}" class="btn btn-primary btn-lg me-2">Nuevo Registro</a>
+  <a href="{{ url_for('web.inventario_listar') }}" class="btn btn-outline-primary btn-lg">Ver Listado</a>
+</div>
+{% endblock %}

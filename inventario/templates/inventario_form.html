@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Nuevo Inventario{% endblock %}
+{% block content %}
+<h2 class="h4 mb-3">Nuevo Registro</h2>
+<form method="POST" class="row g-3">
+  {{ form.csrf_token }}
+  <div class="col-sm-6">{{ form.region.label(class='form-label') }} {{ form.region(class='form-control', placeholder='Región') }}</div>
+  <div class="col-sm-6">{{ form.distrito.label(class='form-label') }} {{ form.distrito(class='form-control') }}</div>
+  <div class="col-sm-6">{{ form.local.label(class='form-label') }} {{ form.local(class='form-control') }}</div>
+  <div class="col-sm-6">{{ form.farmacia.label(class='form-label') }} {{ form.farmacia(class='form-control') }}</div>
+  <div class="col-sm-6">{{ form.puntos_venta.label(class='form-label') }} {{ form.puntos_venta(class='form-control') }}</div>
+  <div class="col-sm-6">{{ form.puntos_falla.label(class='form-label') }} {{ form.puntos_falla(class='form-control') }}</div>
+  <hr/>
+  <div class="col-6 col-md-4">{{ form.monitor_cliente.label(class='form-label small') }} {{ form.monitor_cliente(class='form-select form-select-sm') }}</div>
+  <div class="col-6 col-md-4">{{ form.monitor_asesor.label(class='form-label small') }} {{ form.monitor_asesor(class='form-select form-select-sm') }}</div>
+  <div class="col-6 col-md-4">{{ form.teclado.label(class='form-label small') }} {{ form.teclado(class='form-select form-select-sm') }}</div>
+  <div class="col-6 col-md-4">{{ form.escaner.label(class='form-label small') }} {{ form.escaner(class='form-select form-select-sm') }}</div>
+  <div class="col-6 col-md-4">{{ form.mouse_pcm.label(class='form-label small') }} {{ form.mouse_pcm(class='form-select form-select-sm') }}</div>
+  <div class="col-6 col-md-4">{{ form.teclado_pcm.label(class='form-label small') }} {{ form.teclado_pcm(class='form-select form-select-sm') }}</div>
+  <div class="col-6 col-md-4">{{ form.ups.label(class='form-label small') }} {{ form.ups(class='form-select form-select-sm') }}</div>
+  <div class="col-6 col-md-4">{{ form.red_lenta.label(class='form-label small') }} {{ form.red_lenta(class='form-select form-select-sm') }}</div>
+  <div class="col-6 col-md-4">{{ form.pinpad.label(class='form-label small') }} {{ form.pinpad(class='form-select form-select-sm') }}</div>
+  <div class="col-12">{{ form.comentarios.label(class='form-label') }} {{ form.comentarios(class='form-control', rows=3) }}</div>
+  <div class="col-sm-6">{{ form.estado_reporte.label(class='form-label') }} {{ form.estado_reporte(class='form-select') }}</div>
+  <div class="col-sm-6">{{ form.fecha_solucion.label(class='form-label') }} {{ form.fecha_solucion(class='form-control') }}</div>
+  <div class="col-12 d-flex gap-2 pt-3">
+    <button class="btn btn-primary flex-grow-1" type="submit">Guardar</button>
+    <a href="{{ url_for('web.inventario_listar') }}" class="btn btn-secondary">Volver</a>
+  </div>
+</form>
+{% endblock %}

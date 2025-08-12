@@ -1,2 +1,59 @@
-# APP_INVENTARIO
-App captura de inventario
+# App Inventario (Web + PWA)
+
+Aplicación Flask responsive (móvil, tablet y escritorio) para registrar el estado de equipos y generar reportes.
+
+## Funcionalidades
+- CRUD básico (crear y listar, cierre de reporte)
+- Búsqueda por local
+- Exportación CSV
+- API REST JSON para integración móvil / apps externas
+- PWA: manifest + service worker (cache básico offline)
+
+## Requisitos
+Python 3.10+
+
+## Instalación
+```bash
+pip install -r requirements.txt
+python app.py
+```
+Abrir: http://localhost:5000
+
+## Endpoints API
+GET /api/inventario?search=
+POST /api/inventario (JSON)
+POST /api/inventario/<id>/cerrar
+
+Ejemplo POST JSON:
+```json
+{
+  "region": "Lima",
+  "distrito": "Miraflores",
+  "local": "LOC001",
+  "farmacia": "Farmacia A",
+  "puntos_venta": 5,
+  "puntos_falla": 1,
+  "monitor_cliente": "SÍ",
+  "monitor_asesor": "NO",
+  "teclado": "NO",
+  "escaner": "SÍ",
+  "mouse_pcm": "NO",
+  "teclado_pcm": "NO",
+  "ups": "NO",
+  "red_lenta": "SÍ",
+  "pinpad": "NO",
+  "estado_reporte": "Abierto",
+  "fecha_solucion": null,
+  "comentarios": "Observación"
+}
+```
+
+## PWA
+Instalable en Android/Chrome. Íconos vacíos de ejemplo: reemplazar en `static/icons/`.
+
+## Próximos pasos sugeridos
+- Autenticación (roles)
+- Editar registros
+- Validaciones adicionales
+- Tests automatizados
+- Cache más granular y estrategia background sync
