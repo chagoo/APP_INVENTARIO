@@ -1,16 +1,14 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2>Iniciar sesión</h2>
-<form method="post">
-    {{ form.hidden_tag() }}
-    <div class="mb-3">
-        {{ form.username.label }}
-        {{ form.username(class_='form-control') }}
+<h2 class="h5 mb-3">Iniciar sesión</h2>
+<form method="POST" class="row g-3" autocomplete="off">
+    {{ form.csrf_token }}
+    <div class="col-12">{{ form.username.label(class='form-label') }} {{ form.username(class='form-control') }}</div>
+    <div class="col-12">{{ form.password.label(class='form-label') }} {{ form.password(class='form-control') }}</div>
+    <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">Entrar</button>
+        <a class="btn btn-secondary" href="{{ url_for('web.index') }}">Cancelar</a>
     </div>
-    <div class="mb-3">
-        {{ form.password.label }}
-        {{ form.password(class_='form-control') }}
-    </div>
-    {{ form.submit(class_='btn btn-primary') }}
 </form>
+<div class="mt-3"><a href="{{ url_for('web.password_reset_request') }}" class="small">¿Olvidaste tu contraseña?</a></div>
 {% endblock %}

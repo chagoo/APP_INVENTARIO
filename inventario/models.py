@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from . import db
@@ -53,11 +53,68 @@ class Inventario(db.Model):
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True)
     password_hash = db.Column(db.String(128), nullable=False)
     role = db.Column(db.String(20), default='user')
+    failed_attempts = db.Column(db.Integer, default=0)
+    locked_until = db.Column(db.DateTime)
+    last_login = db.Column(db.DateTime)
+    last_password_change = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+        self.last_password_change = datetime.utcnow()
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    def is_locked(self):
+        return self.locked_until and self.locked_until > datetime.utcnow()
+
+    def register_failed_attempt(self, max_attempts=5, lock_minutes=15):
+        self.failed_attempts += 1
+        if self.failed_attempts >= max_attempts:
+            self.locked_until = datetime.utcnow() + timedelta(minutes=lock_minutes)
+
+
+class AuditLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    action = db.Column(db.String(100), index=True)
+    entity_type = db.Column(db.String(50))
+    entity_id = db.Column(db.String(50))
+    ip = db.Column(db.String(45))
+    meta = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    user = db.relationship('User', backref='audit_events')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'action': self.action,
+            'entity_type': self.entity_type,
+            'entity_id': self.entity_id,
+            'ip': self.ip,
+            'meta': self.meta,
+            'created_at': self.created_at.isoformat(),
+        }
+
+
+class LocalRef(db.Model):
+    """Catálogo de locales para autocompletar campos de Inventario."""
+    id = db.Column(db.Integer, primary_key=True)
+    region = db.Column(db.String(120), index=True)
+    distrito = db.Column(db.String(180), index=True)
+    local = db.Column(db.String(50), unique=True, index=True, nullable=False)
+    farmacia = db.Column(db.String(200))
+
+    def to_dict(self):
+        return {
+            'region': self.region,
+            'distrito': self.distrito,
+            'local': self.local,
+            'farmacia': self.farmacia,
+        }

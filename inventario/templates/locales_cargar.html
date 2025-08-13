@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Cargar Locales{% endblock %}
+{% block content %}
+<h2 class="h5 mb-3">Carga Masiva de Locales</h2>
+<p class="text-muted small">Pega líneas con el formato: <code>REGION\tDISTRITO\tLOCAL\tFARMACIA</code>. Se ignorarán locales ya existentes.</p>
+<form method="POST" action="{{ url_for('web.locales_cargar') }}" class="mb-3" id="form-carga-locales">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="mb-3">
+    <label class="form-label">Datos</label>
+    <textarea name="data" id="txt-locales" class="form-control" rows="10" placeholder="REGIÓN 1\tMONTERREY 10\tN785\tSuc. La capital"></textarea>
+  </div>
+  <button class="btn btn-primary">Cargar</button>
+  <button class="btn btn-outline-secondary" type="button" id="btn-ejemplo">Ejemplo</button>
+  <a href="{{ url_for('web.inventario_listar') }}" class="btn btn-secondary">Volver</a>
+</form>
+<hr/>
+<h6>Locales actuales (máx 200)</h6>
+<table class="table table-sm table-striped">
+  <thead><tr><th>Local</th><th>Farmacia</th><th>Distrito</th><th>Región</th></tr></thead>
+  <tbody>
+  {% for l in existentes %}
+    <tr><td>{{ l.local }}</td><td>{{ l.farmacia }}</td><td>{{ l.distrito }}</td><td>{{ l.region }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<script>
+  document.getElementById('btn-ejemplo').addEventListener('click', () => {
+    const ejemplo = [
+      'REGIÓN 1\tMONTERREY 10\tN785\tSuc. La capital',
+      'REGIÓN 1\tZ. APERTURAS REGION 1 - ELIM\tN811\tSuc. Privadas Las Estancias',
+      'REGIÓN 1\tMONTERREY 5\tN787\tSuc. Lucca',
+      'REGIÓN 1\tMONTERREY 7\tN795\tSuc. Héroes de Lincoln',
+      'REGIÓN 1\tZ. APERTURAS REGION 1 - ELIM\tN801\tSuc. Merco Israel Cavazos'
+    ].join('\n');
+    const ta = document.getElementById('txt-locales');
+    ta.value = ejemplo;
+    ta.focus();
+  });
+</script>
+{% endblock %}

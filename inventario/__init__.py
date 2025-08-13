@@ -29,13 +29,15 @@ def create_app(test_config=None):
     login_manager.init_app(app)
     login_manager.login_view = 'web.login'
 
-    from .routes import web_bp, api_bp
-    app.register_blueprint(web_bp)
-    app.register_blueprint(api_bp, url_prefix="/api")
-
     with app.app_context():
-        db.create_all()
-        # Seed default admin if no users exist
+        # Importar modelos antes de crear tablas para que todos estén registrados (incluye LocalRef)
+        from . import models  # noqa: F401
+        db.create_all()  # crea tablas faltantes sin tocar las existentes
+        _ensure_user_new_columns()  # asegurar columnas nuevas en user
+        from .routes import web_bp, api_bp
+        app.register_blueprint(web_bp)
+        app.register_blueprint(api_bp, url_prefix="/api")
+        # Seed default admin si no hay usuarios
         from .models import User
         if User.query.count() == 0:
             default_user = os.environ.get('ADMIN_USER', 'admin')
@@ -78,3 +80,38 @@ def register_cli(app):
         db.session.add(u)
         db.session.commit()
         print('Usuario creado')
+
+def _ensure_user_new_columns():
+    """Light auto-migration for newly added User columns (SQLite only)."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+    engine = db.engine
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("PRAGMA table_info('user')"))
+            cols = {row[1] for row in result}
+            to_add = []
+            if 'email' not in cols:
+                to_add.append("ALTER TABLE user ADD COLUMN email VARCHAR(120)")
+            if 'failed_attempts' not in cols:
+                to_add.append("ALTER TABLE user ADD COLUMN failed_attempts INTEGER DEFAULT 0")
+            if 'locked_until' not in cols:
+                to_add.append("ALTER TABLE user ADD COLUMN locked_until DATETIME")
+            if 'last_login' not in cols:
+                to_add.append("ALTER TABLE user ADD COLUMN last_login DATETIME")
+            if 'last_password_change' not in cols:
+                to_add.append("ALTER TABLE user ADD COLUMN last_password_change DATETIME")
+            if 'created_at' not in cols:
+                to_add.append("ALTER TABLE user ADD COLUMN created_at DATETIME")
+            for stmt in to_add:
+                try:
+                    conn.execute(text(stmt))
+                except OperationalError:
+                    pass
+            if 'email' not in cols:
+                try:
+                    conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_user_email ON user(email)"))
+                except OperationalError:
+                    pass
+    except Exception:
+        return

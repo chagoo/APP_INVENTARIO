@@ -6,7 +6,11 @@
   {{ form.hidden_tag() }}
   <div class="col-sm-6">{{ form.region.label(class='form-label') }} {{ form.region(class='form-control', placeholder='Región') }}</div>
   <div class="col-sm-6">{{ form.distrito.label(class='form-label') }} {{ form.distrito(class='form-control') }}</div>
-  <div class="col-sm-6">{{ form.local.label(class='form-label') }} {{ form.local(class='form-control') }}</div>
+  <div class="col-sm-6 position-relative">
+    {{ form.local.label(class='form-label') }}
+    {{ form.local(class='form-control', autocomplete='off', placeholder='Código Local') }}
+    <div id="local-suggestions" class="list-group position-absolute w-100" style="z-index:1000; max-height:200px; overflow:auto; display:none;"></div>
+  </div>
   <div class="col-sm-6">{{ form.farmacia.label(class='form-label') }} {{ form.farmacia(class='form-control') }}</div>
   <div class="col-sm-6">{{ form.puntos_venta.label(class='form-label') }} {{ form.puntos_venta(class='form-control') }}</div>
   <div class="col-sm-6">{{ form.puntos_falla.label(class='form-label') }} {{ form.puntos_falla(class='form-control') }}</div>
@@ -27,5 +31,49 @@
     <button class="btn btn-primary flex-grow-1" type="submit">Guardar</button>
     <a href="{{ url_for('web.inventario_listar') }}" class="btn btn-secondary">Volver</a>
   </div>
+  <script>
+    const inputLocal = document.getElementById('{{ form.local.id }}');
+    const inputRegion = document.getElementById('{{ form.region.id }}');
+    const inputDistrito = document.getElementById('{{ form.distrito.id }}');
+    const inputFarmacia = document.getElementById('{{ form.farmacia.id }}');
+    const box = document.getElementById('local-suggestions');
+    let timer;
+
+    async function searchLocales(q) {
+      const resp = await fetch(`/api/locales?q=${encodeURIComponent(q)}`);
+      if(!resp.ok) return [];
+      return await resp.json();
+    }
+    function clearSuggestions(){ box.innerHTML=''; box.style.display='none'; }
+    function renderSuggestions(items){
+      if(!items.length){ clearSuggestions(); return; }
+      box.innerHTML = '';
+      items.forEach(it => {
+        const a = document.createElement('button');
+        a.type='button';
+        a.className='list-group-item list-group-item-action py-1';
+        a.textContent = `${it.local} - ${it.farmacia}`;
+        a.addEventListener('click', () => {
+          inputLocal.value = it.local;
+          inputRegion.value = it.region;
+          inputDistrito.value = it.distrito;
+          inputFarmacia.value = it.farmacia;
+          clearSuggestions();
+        });
+        box.appendChild(a);
+      });
+      box.style.display='block';
+    }
+    inputLocal.addEventListener('input', () => {
+      const q = inputLocal.value.trim();
+      if(q.length < 2){ clearSuggestions(); return; }
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const data = await searchLocales(q);
+        renderSuggestions(data);
+      }, 250);
+    });
+    document.addEventListener('click', (e)=>{ if(!box.contains(e.target) && e.target !== inputLocal){ clearSuggestions(); } });
+  </script>
 </form>
 {% endblock %}

@@ -1,11 +1,14 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file, current_app, make_response
 from flask_login import login_user, logout_user, login_required, current_user
 from . import db, csrf
-from .models import Inventario, User
-from .forms import InventarioForm, SearchForm, LoginForm, UserCreateForm, UserEditForm
+from .models import Inventario, User, AuditLog
+from .forms import InventarioForm, SearchForm, LoginForm, UserCreateForm, UserEditForm, LocalRefForm
+from .models import LocalRef
 from io import StringIO, BytesIO
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
+import hashlib
 from functools import wraps
 
 web_bp = Blueprint('web', __name__)
@@ -43,10 +46,24 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
-        if user and user.check_password(form.password.data):
-            login_user(user)
-            return redirect(url_for('web.index'))
-        flash('Credenciales inválidas', 'danger')
+        if not user:
+            flash('Credenciales inválidas', 'danger')
+        else:
+            if user.is_locked():
+                flash('Cuenta bloqueada temporalmente. Intenta más tarde.', 'warning')
+            elif user.check_password(form.password.data):
+                user.failed_attempts = 0
+                user.locked_until = None
+                user.last_login = datetime.utcnow()
+                db.session.commit()
+                login_user(user)
+                log_event('login_success', user.id, ip=request.remote_addr)
+                return redirect(url_for('web.index'))
+            else:
+                user.register_failed_attempt()
+                db.session.commit()
+                log_event('login_failed', user.id if user else None, ip=request.remote_addr)
+                flash('Credenciales inválidas', 'danger')
     return render_template('login.html', form=form)
 
 
@@ -54,13 +71,87 @@ def login():
 @login_required
 def logout():
     logout_user()
+    log_event('logout', current_user.id if current_user.is_authenticated else None, ip=request.remote_addr)
     return redirect(url_for('web.index'))
 
+# --- Password Reset ---
+def generate_reset_token(user, expires_minutes=30):
+    raw = f"{user.id}:{user.password_hash}:{datetime.utcnow().isoformat()}:{secrets.token_urlsafe(16)}"
+    token = hashlib.sha256(raw.encode()).hexdigest()
+    current_app.config.setdefault('RESET_TOKENS', {})
+    current_app.config['RESET_TOKENS'][token] = (user.id, datetime.utcnow() + timedelta(minutes=expires_minutes))
+    return token
+
+def validate_reset_token(token):
+    data = current_app.config.get('RESET_TOKENS', {}).get(token)
+    if not data:
+        return None
+    user_id, expires = data
+    if expires < datetime.utcnow():
+        current_app.config['RESET_TOKENS'].pop(token, None)
+        return None
+    return User.query.get(user_id)
+
+@web_bp.route('/password/reset', methods=['GET','POST'])
+def password_reset_request():
+    if request.method == 'POST':
+        username_or_email = request.form.get('identity','').strip()
+        user = User.query.filter((User.username==username_or_email) | (User.email==username_or_email)).first()
+        if user:
+            token = generate_reset_token(user)
+            reset_link = url_for('web.password_reset_token', token=token, _external=True)
+            # Placeholder de envío: aquí se integraría con un servicio de correo real
+            current_app.logger.info(f"Enlace de reseteo para {user.username}: {reset_link}")
+            flash('Si el usuario existe, se envió un enlace de restablecimiento (ver logs).','info')
+        else:
+            flash('Si el usuario existe, se envió un enlace de restablecimiento (ver logs).','info')
+        return redirect(url_for('web.login'))
+    return render_template('password_reset_request.html')
+
+@web_bp.route('/password/reset/<token>', methods=['GET','POST'])
+def password_reset_token(token):
+    user = validate_reset_token(token)
+    if not user:
+        flash('Token inválido o expirado','danger')
+        return redirect(url_for('web.login'))
+    if request.method == 'POST':
+        pw1 = request.form.get('password')
+        pw2 = request.form.get('confirm')
+        if not pw1 or len(pw1) < 4:
+            flash('Contraseña muy corta','danger')
+        elif pw1 != pw2:
+            flash('No coincide la confirmación','danger')
+        else:
+            user.set_password(pw1)
+            db.session.commit()
+            flash('Contraseña actualizada','success')
+            log_event('password_reset', user.id, ip=request.remote_addr)
+            return redirect(url_for('web.login'))
+    return render_template('password_reset_form.html', token=token)
+
+def log_event(action, user_id=None, entity_type=None, entity_id=None, meta=None, ip=None):
+    try:
+        event = AuditLog(user_id=user_id, action=action, entity_type=entity_type, entity_id=str(entity_id) if entity_id else None, meta=meta, ip=ip)
+        db.session.add(event)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
 @web_bp.route('/inventario/nuevo', methods=['GET','POST'])
-@roles_required('admin')
+@roles_required('admin','user')
 def inventario_nuevo():
     form = InventarioForm()
+    locales = LocalRef.query.order_by(LocalRef.local).limit(50).all()  # solo algunos por si quieres mostrar algo inicial
     if form.validate_on_submit():
+        # Forzar datos canónicos si el local existe en catálogo
+        canon = LocalRef.query.filter_by(local=form.local.data.strip()).first()
+        if canon:
+            orig_region, orig_distrito, orig_farmacia = form.region.data, form.distrito.data, form.farmacia.data
+            form.region.data = canon.region
+            form.distrito.data = canon.distrito
+            form.farmacia.data = canon.farmacia
+            if (orig_region, orig_distrito, orig_farmacia) != (canon.region, canon.distrito, canon.farmacia):
+                flash('Datos de región/distrito/farmacia ajustados al catálogo','info')
         item = Inventario(
             region=form.region.data,
             distrito=form.distrito.data,
@@ -84,21 +175,30 @@ def inventario_nuevo():
         db.session.add(item)
         db.session.commit()
         flash('Inventario guardado','success')
+        log_event('inventario_create', current_user.id, 'Inventario', item.id, ip=request.remote_addr)
         return redirect(url_for('web.inventario_listar'))
-    return render_template('inventario_form.html', form=form)
+    return render_template('inventario_form.html', form=form, locales=[l.to_dict() for l in locales])
 
 
 @web_bp.route('/inventario/<int:item_id>/editar', methods=['GET', 'POST'])
-@roles_required('admin')
+@roles_required('admin','user')
 def inventario_editar(item_id):
     item = Inventario.query.get_or_404(item_id)
     form = InventarioForm(obj=item)
+    locales = LocalRef.query.order_by(LocalRef.local).limit(50).all()
     if form.validate_on_submit():
+        canon = LocalRef.query.filter_by(local=form.local.data.strip()).first()
+        if canon:
+            form.region.data = canon.region
+            form.distrito.data = canon.distrito
+            form.farmacia.data = canon.farmacia
+            flash('Datos de región/distrito/farmacia ajustados al catálogo','info')
         form.populate_obj(item)
         db.session.commit()
         flash('Inventario actualizado', 'success')
+        log_event('inventario_update', current_user.id, 'Inventario', item.id, ip=request.remote_addr)
         return redirect(url_for('web.inventario_listar'))
-    return render_template('inventario_form.html', form=form)
+    return render_template('inventario_form.html', form=form, locales=[l.to_dict() for l in locales])
 
 
 @web_bp.route('/inventario/<int:item_id>/eliminar', methods=['POST'])
@@ -108,6 +208,7 @@ def inventario_eliminar(item_id):
     db.session.delete(item)
     db.session.commit()
     flash('Inventario eliminado', 'success')
+    log_event('inventario_delete', current_user.id, 'Inventario', item.id, ip=request.remote_addr)
     return redirect(url_for('web.inventario_listar'))
 
 @web_bp.route('/inventario', methods=['GET','POST'])
@@ -129,7 +230,7 @@ def inventario_listar():
                            filtro_local=filtro_local)
 
 @web_bp.route('/inventario/<int:item_id>/cerrar', methods=['POST'])
-@roles_required('admin')
+@roles_required('admin','user')
 def inventario_cerrar(item_id):
     item = Inventario.query.get_or_404(item_id)
     item.estado_reporte = 'Cerrado'
@@ -137,7 +238,171 @@ def inventario_cerrar(item_id):
         item.fecha_solucion = datetime.utcnow().date()
     db.session.commit()
     flash('Reporte cerrado','success')
+    log_event('inventario_close', current_user.id, 'Inventario', item.id, ip=request.remote_addr)
     return redirect(url_for('web.inventario_listar'))
+
+@web_bp.route('/locales/cargar', methods=['POST'])
+@roles_required('admin')
+def locales_cargar():
+    """Carga masiva rápida desde un textarea (REGION\tDISTRITO\tLOCAL\tFARMACIA)."""
+    contenido = request.form.get('data','').strip()
+    if not contenido:
+        flash('Sin datos','warning')
+        return redirect(url_for('web.inventario_listar'))
+    # Normalizar: algunos pegados muestran 't\' en vez de \t
+    contenido_norm = contenido.replace('t\\', '\t').replace('t/', '\t')
+    lines = [l for l in contenido_norm.splitlines() if l.strip()]
+    creados = 0
+    for line in lines:
+        raw_parts = line.split('\t')
+        parts = [p.strip() for p in raw_parts if p is not None]
+        if len(parts) < 4:
+            continue
+        region, distrito, local_code, farmacia = parts[:4]
+        if not local_code:
+            continue
+        if not LocalRef.query.filter_by(local=local_code).first():
+            db.session.add(LocalRef(region=region, distrito=distrito, local=local_code, farmacia=farmacia))
+            creados += 1
+    db.session.commit()
+    flash(f'{creados} locales cargados','success')
+    if creados:
+        log_event('locales_bulk_load', current_user.id, 'LocalRef', meta=f'{creados} nuevos', ip=request.remote_addr)
+    return redirect(url_for('web.locales_form_cargar'))
+
+@web_bp.route('/locales/cargar', methods=['GET'])
+@roles_required('admin')
+def locales_form_cargar():
+    existentes = LocalRef.query.order_by(LocalRef.local).limit(200).all()
+    return render_template('locales_cargar.html', existentes=existentes)
+
+@web_bp.route('/locales', methods=['GET'])
+@roles_required('admin')
+def locales_listar():
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    q = request.args.get('q','').strip()
+    query = LocalRef.query
+    if q:
+        like = f"%{q}%"
+        query = query.filter((LocalRef.local.ilike(like)) | (LocalRef.farmacia.ilike(like)) | (LocalRef.distrito.ilike(like)))
+    total = query.count()
+    paginated = query.order_by(LocalRef.local).paginate(page=page, per_page=per_page)
+    return render_template('locales_list.html', locales=paginated.items, total=total, page=page,
+                           pages=paginated.pages, q=q, has_prev=paginated.has_prev, has_next=paginated.has_next,
+                           prev_page=paginated.prev_num if paginated.has_prev else None,
+                           next_page=paginated.next_num if paginated.has_next else None)
+
+@web_bp.route('/locales/nuevo', methods=['GET','POST'])
+@roles_required('admin')
+def locales_nuevo():
+    form = LocalRefForm()
+    if form.validate_on_submit():
+        if LocalRef.query.filter_by(local=form.local.data).first():
+            flash('Local ya existe','warning')
+        else:
+            l = LocalRef(region=form.region.data, distrito=form.distrito.data, local=form.local.data, farmacia=form.farmacia.data)
+            db.session.add(l)
+            db.session.commit()
+            flash('Local creado','success')
+            log_event('local_create', current_user.id, 'LocalRef', l.id, ip=request.remote_addr)
+            return redirect(url_for('web.locales_listar'))
+    return render_template('local_form.html', form=form, modo='nuevo')
+
+@web_bp.route('/locales/<int:local_id>/editar', methods=['GET','POST'])
+@roles_required('admin')
+def locales_editar(local_id):
+    l = LocalRef.query.get_or_404(local_id)
+    form = LocalRefForm(obj=l)
+    if form.validate_on_submit():
+        # Si cambia el código local validar unicidad
+        if form.local.data != l.local and LocalRef.query.filter_by(local=form.local.data).first():
+            flash('Código local ya existe','warning')
+        else:
+            form.populate_obj(l)
+            db.session.commit()
+            flash('Local actualizado','success')
+            log_event('local_update', current_user.id, 'LocalRef', l.id, ip=request.remote_addr)
+            return redirect(url_for('web.locales_listar'))
+    return render_template('local_form.html', form=form, modo='editar', local_ref=l)
+
+@web_bp.route('/locales/<int:local_id>/eliminar', methods=['POST'])
+@roles_required('admin')
+def locales_eliminar(local_id):
+    l = LocalRef.query.get_or_404(local_id)
+    db.session.delete(l)
+    db.session.commit()
+    flash('Local eliminado','success')
+    log_event('local_delete', current_user.id, 'LocalRef', l.id, ip=request.remote_addr)
+    return redirect(url_for('web.locales_listar'))
+
+@web_bp.route('/locales/eliminar_todos', methods=['POST'])
+@roles_required('admin')
+def locales_eliminar_todos():
+    borrados = LocalRef.query.delete()
+    db.session.commit()
+    flash(f'{borrados} locales eliminados','success')
+    if borrados:
+        log_event('local_delete_all', current_user.id, 'LocalRef', meta=f'{borrados} eliminados', ip=request.remote_addr)
+    return redirect(url_for('web.locales_listar'))
+
+@web_bp.route('/locales/csv')
+@roles_required('admin')
+def locales_csv():
+    from io import StringIO, BytesIO
+    import csv
+    output_text = StringIO()
+    writer = csv.writer(output_text)
+    writer.writerow(['region','distrito','local','farmacia'])
+    for l in LocalRef.query.order_by(LocalRef.local).all():
+        writer.writerow([l.region, l.distrito, l.local, l.farmacia])
+    data = '\ufeff' + output_text.getvalue()
+    bio = BytesIO(data.encode('utf-8'))
+    bio.seek(0)
+    return send_file(bio, mimetype='text/csv; charset=utf-8', as_attachment=True, download_name='locales.csv')
+
+@web_bp.route('/locales/importar', methods=['GET','POST'])
+@roles_required('admin')
+def locales_importar_csv():
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if not file or file.filename == '':
+            flash('Archivo no seleccionado','warning')
+            return redirect(request.url)
+        try:
+            content = file.read().decode('utf-8-sig')
+        except UnicodeDecodeError:
+            content = file.read().decode('latin-1')
+        reader = csv.reader(content.splitlines())
+        header = next(reader, [])
+        # Permitir encabezados variables en minúsculas
+        header_norm = [h.strip().lower() for h in header]
+        idx_map = {name: header_norm.index(name) for name in ['region','distrito','local','farmacia'] if name in header_norm}
+        if len(idx_map) < 4:
+            flash('Encabezados requeridos: region,distrito,local,farmacia','danger')
+            return redirect(request.url)
+        creados = 0
+        for row in reader:
+            if not row or len(row) < 4:
+                continue
+            try:
+                region = row[idx_map['region']].strip()
+                distrito = row[idx_map['distrito']].strip()
+                local_code = row[idx_map['local']].strip()
+                farmacia = row[idx_map['farmacia']].strip()
+            except Exception:
+                continue
+            if not local_code:
+                continue
+            if not LocalRef.query.filter_by(local=local_code).first():
+                db.session.add(LocalRef(region=region, distrito=distrito, local=local_code, farmacia=farmacia))
+                creados += 1
+        db.session.commit()
+        flash(f'{creados} locales importados','success')
+        if creados:
+            log_event('locales_import_csv', current_user.id, 'LocalRef', meta=f'{creados} nuevos', ip=request.remote_addr)
+        return redirect(url_for('web.locales_listar'))
+    return render_template('locales_importar.html')
 
 @web_bp.route('/usuarios')
 @roles_required('admin')
@@ -155,6 +420,7 @@ def usuarios_nuevo():
         db.session.add(u)
         db.session.commit()
         flash('Usuario creado','success')
+        log_event('user_create', current_user.id, 'User', u.id, ip=request.remote_addr)
         return redirect(url_for('web.usuarios_listar'))
     return render_template('user_form.html', form=form, modo='nuevo')
 
@@ -169,6 +435,7 @@ def usuarios_editar(user_id):
             u.set_password(form.password.data)
         db.session.commit()
         flash('Usuario actualizado','success')
+        log_event('user_update', current_user.id, 'User', u.id, ip=request.remote_addr)
         return redirect(url_for('web.usuarios_listar'))
     return render_template('user_form.html', form=form, modo='editar', usuario=u)
 
@@ -182,6 +449,7 @@ def usuarios_eliminar(user_id):
     db.session.delete(u)
     db.session.commit()
     flash('Usuario eliminado','success')
+    log_event('user_delete', current_user.id, 'User', u.id, ip=request.remote_addr)
     return redirect(url_for('web.usuarios_listar'))
 
 @web_bp.route('/inventario/csv')
@@ -212,16 +480,28 @@ def api_inventario_list():
     data = [i.to_dict() for i in query.order_by(Inventario.fecha_registro.desc()).limit(200)]
     return jsonify(data)
 
+@api_bp.route('/locales', methods=['GET'])
+def api_locales_list():
+    q = request.args.get('q','').strip()
+    query = LocalRef.query
+    if q:
+        like = f"%{q}%"
+        query = query.filter((LocalRef.local.ilike(like)) | (LocalRef.farmacia.ilike(like)))
+    return jsonify([l.to_dict() for l in query.order_by(LocalRef.local).limit(500)])
+
 @api_bp.route('/inventario', methods=['POST'])
 @csrf.exempt
 @require_api_token
 def api_inventario_create():
     payload = request.get_json() or {}
+    canon = None
+    if payload.get('local'):
+        canon = LocalRef.query.filter_by(local=str(payload.get('local')).strip()).first()
     item = Inventario(
-        region=payload.get('region'),
-        distrito=payload.get('distrito'),
+        region=canon.region if canon else payload.get('region'),
+        distrito=canon.distrito if canon else payload.get('distrito'),
         local=payload.get('local'),
-        farmacia=payload.get('farmacia'),
+        farmacia=canon.farmacia if canon else payload.get('farmacia'),
         puntos_venta=payload.get('puntos_venta'),
         puntos_falla=payload.get('puntos_falla'),
         monitor_cliente=payload.get('monitor_cliente','NO'),

@@ -13,6 +13,7 @@ class SearchForm(FlaskForm):
 class InventarioForm(FlaskForm):
     region = StringField('Región', validators=[DataRequired()])
     distrito = StringField('Distrito')
+    # Regresamos a StringField para permitir autocompletar dinámico (no cargamos miles de opciones en el HTML).
     local = StringField('Local', validators=[DataRequired()])
     farmacia = StringField('Farmacia', validators=[DataRequired()])
     puntos_venta = IntegerField('Pts Venta', validators=[Optional()])
@@ -55,3 +56,11 @@ class UserEditForm(FlaskForm):
     password = PasswordField('Nueva Contraseña', validators=[Optional(), Length(min=4)])
     confirm = PasswordField('Repetir Contraseña', validators=[Optional(), EqualTo('password', message='No coincide')])
     submit = SubmitField('Actualizar')
+
+
+class LocalRefForm(FlaskForm):
+    region = StringField('Región', validators=[DataRequired()])
+    distrito = StringField('Distrito', validators=[DataRequired()])
+    local = StringField('Local', validators=[DataRequired(), Length(max=50)])
+    farmacia = StringField('Farmacia', validators=[DataRequired(), Length(max=200)])
+    submit = SubmitField('Guardar')

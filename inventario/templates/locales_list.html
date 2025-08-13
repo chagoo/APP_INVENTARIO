@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}Locales{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h5 mb-0">Locales <span class="badge bg-secondary">{{ total }}</span></h2>
+  <div class="btn-group">
+    <a href="{{ url_for('web.locales_nuevo') }}" class="btn btn-sm btn-primary">Nuevo</a>
+    <a href="{{ url_for('web.locales_csv') }}" class="btn btn-sm btn-outline-success">Exportar CSV</a>
+  <a href="{{ url_for('web.locales_importar_csv') }}" class="btn btn-sm btn-outline-secondary">Importar CSV</a>
+    <form method="POST" action="{{ url_for('web.locales_eliminar_todos') }}" onsubmit="return confirm('¿Eliminar todos los locales?');" class="d-inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-outline-danger">Borrar Todos</button>
+    </form>
+  </div>
+</div>
+<form class="row g-2 mb-3" method="GET">
+  <div class="col-auto">
+    <input type="text" class="form-control form-control-sm" name="q" value="{{ q }}" placeholder="Buscar código / farmacia / distrito">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-outline-secondary">Buscar</button>
+  </div>
+</form>
+<table class="table table-sm table-striped align-middle">
+  <thead class="table-light">
+    <tr>
+      <th>Código</th><th>Farmacia</th><th>Distrito</th><th>Región</th><th style="width:140px;">Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for l in locales %}
+    <tr>
+      <td>{{ l.local }}</td>
+      <td>{{ l.farmacia }}</td>
+      <td>{{ l.distrito }}</td>
+      <td>{{ l.region }}</td>
+      <td>
+        <a href="{{ url_for('web.locales_editar', local_id=l.id) }}" class="btn btn-sm btn-outline-primary">Editar</a>
+        <form method="POST" action="{{ url_for('web.locales_eliminar', local_id=l.id) }}" style="display:inline" onsubmit="return confirm('¿Eliminar este local?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm btn-outline-danger">X</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<nav>
+  <ul class="pagination pagination-sm">
+    {% if has_prev %}
+      <li class="page-item"><a class="page-link" href="{{ url_for('web.locales_listar', page=prev_page, q=q) }}">«</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">«</span></li>
+    {% endif %}
+    <li class="page-item disabled"><span class="page-link">Página {{ page }} / {{ pages }}</span></li>
+    {% if has_next %}
+      <li class="page-item"><a class="page-link" href="{{ url_for('web.locales_listar', page=next_page, q=q) }}">»</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">»</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endblock %}
