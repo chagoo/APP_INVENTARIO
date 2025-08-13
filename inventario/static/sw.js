@@ -1,7 +1,10 @@
-const CACHE_NAME = 'inventario-cache-v1';
+const CACHE_NAME = 'inventario-cache-v2';
 const OFFLINE_URLS = [
   '/',
-  '/static/css/styles.css'
+  '/static/css/styles.css',
+  '/static/js/offline.js',
+  '/static/icons/icon-192.png',
+  '/static/icons/icon-512.png'
 ];
 self.addEventListener('install', evt => {
   evt.waitUntil(

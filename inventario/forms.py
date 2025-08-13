@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, IntegerField, TextAreaField, SelectField, DateField, SubmitField, PasswordField
-from wtforms.validators import DataRequired, Optional, Length, EqualTo, ValidationError
+from wtforms.validators import DataRequired, Optional, Length, EqualTo, ValidationError, NumberRange
 from .models import User
 
 COMMON_CHOICES = [('NO','NO'),('SÍ','SÍ')]
@@ -16,8 +16,8 @@ class InventarioForm(FlaskForm):
     # Regresamos a StringField para permitir autocompletar dinámico (no cargamos miles de opciones en el HTML).
     local = StringField('Local', validators=[DataRequired()])
     farmacia = StringField('Farmacia', validators=[DataRequired()])
-    puntos_venta = IntegerField('Pts Venta', validators=[Optional()])
-    puntos_falla = IntegerField('Pts Falla', validators=[Optional()])
+    puntos_venta = IntegerField('Pts Venta', validators=[Optional(), NumberRange(min=0)])
+    puntos_falla = IntegerField('Pts Falla', validators=[Optional(), NumberRange(min=0)])
     monitor_cliente = SelectField('Monitor Cliente', choices=COMMON_CHOICES)
     monitor_asesor = SelectField('Monitor Asesor', choices=COMMON_CHOICES)
     teclado = SelectField('Teclado', choices=COMMON_CHOICES)

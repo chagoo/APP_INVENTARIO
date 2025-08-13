@@ -39,7 +39,7 @@ def create_app(test_config=None):
         app.register_blueprint(api_bp, url_prefix="/api")
         # Seed default admin si no hay usuarios
         from .models import User
-        if User.query.count() == 0:
+        if User.query.count() == 0 and not app.config.get('TESTING'):
             default_user = os.environ.get('ADMIN_USER', 'admin')
             default_pass = os.environ.get('ADMIN_PASS', 'admin')
             u = User(username=default_user, role='admin')
