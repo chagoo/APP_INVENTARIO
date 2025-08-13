@@ -1,7 +1,24 @@
-body { -webkit-font-smoothing: antialiased; }
+:root {
+  --font-base-size: 1rem;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  font-size: var(--font-base-size);
+}
+
+[data-bs-theme="dark"] {
+  --bs-body-bg: #121212;
+  --bs-body-color: #e9ecef;
+  --bs-card-bg: #1e1e1e;
+  --bs-border-color: #2e2e2e;
+}
+
 .table-responsive { max-height:70vh; }
+
 @media (max-width: 576px){
-  table.table thead { position:sticky; top:0; background:#fff; }
+  table.table thead { position:sticky; top:0; background: var(--bs-body-bg); }
   .navbar-brand { font-size:1rem; }
   h1.display-6 { font-size:1.5rem; }
+  :root { --font-base-size: 0.9375rem; }
 }

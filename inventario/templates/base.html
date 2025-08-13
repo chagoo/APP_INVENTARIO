@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es" class="h-100">
+<html lang="es" class="h-100" data-bs-theme="light">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,14 +11,14 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   </head>
   <body class="d-flex flex-column h-100">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary" role="navigation" aria-label="Navegación principal">
       <div class="container-fluid">
         <a class="navbar-brand" href="{{ url_for('web.index') }}">Inventario</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarsExample" aria-controls="navbarsExample" aria-expanded="false" aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarsExample">
-          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0" aria-label="Menú principal">
             <li class="nav-item"><a class="nav-link" href="{{ url_for('web.inventario_listar') }}">Listado</a></li>
             {% if current_user.is_authenticated %}
               <li class="nav-item"><a class="nav-link" href="{{ url_for('web.inventario_nuevo') }}">Nuevo</a></li>
@@ -28,9 +28,12 @@
               {% endif %}
             {% endif %}
           </ul>
-          <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+          <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center" aria-label="Menú de usuario">
+            <li class="nav-item me-2">
+              <button class="btn btn-sm btn-outline-light" id="themeToggle" type="button" aria-label="Cambiar tema">🌙</button>
+            </li>
             {% if current_user.is_authenticated %}
-              <li class="nav-item"><span class="navbar-text small me-2">👤 {{ current_user.username }} ({{ current_user.role }})</span></li>
+              <li class="nav-item"><span class="navbar-text small me-2" aria-label="Usuario actual">👤 {{ current_user.username }} ({{ current_user.role }})</span></li>
               <li class="nav-item"><a class="nav-link" href="{{ url_for('web.logout') }}">Salir</a></li>
             {% else %}
               <li class="nav-item"><a class="nav-link" href="{{ url_for('web.login') }}">Ingresar</a></li>
@@ -62,6 +65,14 @@
           navigator.serviceWorker.register("{{ url_for('web.sw') }}");
         });
       }
+      const storedTheme = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-bs-theme', storedTheme);
+      const themeToggle = document.getElementById('themeToggle');
+      themeToggle && themeToggle.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-bs-theme', current);
+        localStorage.setItem('theme', current);
+      });
     </script>
     {% block scripts %}{% endblock %}
   </body>
