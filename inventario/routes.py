@@ -138,7 +138,7 @@ def log_event(action, user_id=None, entity_type=None, entity_id=None, meta=None,
         db.session.rollback()
 
 @web_bp.route('/inventario/nuevo', methods=['GET','POST'])
-@roles_required('admin','user')
+@roles_required('admin')
 def inventario_nuevo():
     form = InventarioForm()
     locales = LocalRef.query.order_by(LocalRef.local).limit(50).all()  # solo algunos por si quieres mostrar algo inicial
