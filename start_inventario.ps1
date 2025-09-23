@@ -98,11 +98,22 @@ serve(app, listen='0.0.0.0:$Port', threads=$Threads)
     try { python $tmp2 } finally { Remove-Item $tmp2 -ErrorAction SilentlyContinue }
 }
 
-# Lanzar servidor (intenta waitress-serve si existe; si no, fallback a python -m waitress; último recurso ejecución directa)
-if (Get-Command waitress-serve -ErrorAction SilentlyContinue) {
-    Write-Host "Iniciando waitress-serve (bloqueante Ctrl+C para detener)..." -ForegroundColor Green
-    Start-Process -FilePath (Get-Command waitress-serve).Source -ArgumentList @("--listen=0.0.0.0:$Port","--threads=$Threads","$entry") -NoNewWindow -Wait
-    exit $LASTEXITCODE
+# Lanzar servidor (robusto contra ejecutable waitress-serve corrupto de otro venv)
+$waitressCmd = Get-Command waitress-serve -ErrorAction SilentlyContinue
+if ($waitressCmd) {
+    Write-Host "Detectado waitress-serve. Verificando integridad..." -ForegroundColor DarkGray
+    try {
+        & $waitressCmd.Source --version *> $null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Iniciando waitress-serve (Ctrl+C para detener)..." -ForegroundColor Green
+            Start-Process -FilePath $waitressCmd.Source -ArgumentList @("--listen=0.0.0.0:$Port","--threads=$Threads","$entry") -NoNewWindow -Wait
+            exit $LASTEXITCODE
+        } else {
+            Write-Warning "waitress-serve parece corrupto (exit $LASTEXITCODE). Fallback a python -m waitress."
+        }
+    } catch {
+        Write-Warning "Error ejecutando waitress-serve ($_). Fallback a python -m waitress."
+    }
 }
 
 python -m waitress --listen=0.0.0.0:$Port --threads=$Threads $entry

@@ -44,12 +44,16 @@ def index():
 
 @web_bp.route('/__health')
 def health():
-    # Dev aide: lista rutas y versión
-    rules = sorted([r.rule for r in web_bp.url_map.iter_rules()]) if web_bp.url_map else []
+    # Dev aide: lista rutas y versión usando el mapa global de la app
+    try:
+        rules = sorted([r.rule for r in current_app.url_map.iter_rules()])
+    except Exception:
+        rules = []
     return jsonify({
         'version': APP_VERSION,
         'routes_contains_checklists': any('checklists' in r for r in rules),
-        'total_rules': len(rules)
+        'total_rules': len(rules),
+        'sample': rules[:25]
     })
 
 
