@@ -2,6 +2,10 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, IntegerField, TextAreaField, SelectField, DateField, SubmitField, PasswordField
 from wtforms.validators import DataRequired, Optional, Length, EqualTo, ValidationError, NumberRange
 from .models import User
+from wtforms import FieldList, FormField, HiddenField
+
+
+CHECKLIST_ESTADO_CHOICES = [('Pendiente','Pendiente'),('OK','OK'),('Alerta','Alerta')]
 
 COMMON_CHOICES = [('NO','NO'),('SÍ','SÍ')]
 STATE_CHOICES = [('Abierto','Abierto'),('En proceso','En proceso'),('Cerrado','Cerrado')]
@@ -64,3 +68,20 @@ class LocalRefForm(FlaskForm):
     local = StringField('Local', validators=[DataRequired(), Length(max=50)])
     farmacia = StringField('Farmacia', validators=[DataRequired(), Length(max=200)])
     submit = SubmitField('Guardar')
+
+
+class OperationChecklistItemForm(FlaskForm):
+    servicio = StringField('Servicio')  # solo lectura en template
+    responsable = StringField('Responsable')  # solo lectura
+    hora_objetivo = StringField('Hora')  # solo lectura
+    estado = SelectField('Estado', choices=CHECKLIST_ESTADO_CHOICES)
+    observacion = TextAreaField('Observación', validators=[Optional(), Length(max=500)])
+    # hidden para mantener orden
+    _idx = HiddenField()
+
+
+class OperationChecklistForm(FlaskForm):
+    fecha = DateField('Fecha', validators=[Optional()])  # default se setea en vista
+    comentarios = TextAreaField('Comentarios', validators=[Optional(), Length(max=1000)])
+    items = FieldList(FormField(OperationChecklistItemForm))
+    submit = SubmitField('Guardar Checklist')

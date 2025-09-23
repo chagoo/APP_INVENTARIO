@@ -2,8 +2,9 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_user, logout_user, login_required, current_user
 from . import db, csrf
 from .models import Inventario, User, AuditLog
-from .forms import InventarioForm, SearchForm, LoginForm, UserCreateForm, UserEditForm, LocalRefForm
-from .models import LocalRef
+from .forms import InventarioForm, SearchForm, LoginForm, UserCreateForm, UserEditForm, LocalRefForm, OperationChecklistForm
+from .models import LocalRef, OperationChecklist, OperationChecklistItem
+from .locales_data import CHECKLIST_SERVICIOS_BASE
 from io import StringIO, BytesIO
 import csv
 from datetime import datetime, timedelta
@@ -13,6 +14,7 @@ from functools import wraps
 
 web_bp = Blueprint('web', __name__)
 api_bp = Blueprint('api', __name__)
+APP_VERSION = '2025.09.22-checklists'
 
 
 def require_api_token(view):
@@ -39,6 +41,16 @@ def roles_required(*roles):
 @web_bp.route('/')
 def index():
     return render_template('index.html')
+
+@web_bp.route('/__health')
+def health():
+    # Dev aide: lista rutas y versión
+    rules = sorted([r.rule for r in web_bp.url_map.iter_rules()]) if web_bp.url_map else []
+    return jsonify({
+        'version': APP_VERSION,
+        'routes_contains_checklists': any('checklists' in r for r in rules),
+        'total_rules': len(rules)
+    })
 
 
 @web_bp.route('/login', methods=['GET', 'POST'])
@@ -520,6 +532,65 @@ def api_inventario_create():
     db.session.add(item)
     db.session.commit()
     return jsonify(item.to_dict()), 201
+
+# ---------------- Checklist Operación Diaria ----------------
+@web_bp.route('/checklists')
+@roles_required('admin','user')
+def checklist_historial():
+    page = request.args.get('page', 1, type=int)
+    paginated = OperationChecklist.query.order_by(OperationChecklist.fecha.desc(), OperationChecklist.id.desc()).paginate(page=page, per_page=15)
+    return render_template('checklist_list.html', registros=paginated.items, page=page,
+                           next_page=paginated.next_num if paginated.has_next else None,
+                           prev_page=paginated.prev_num if paginated.has_prev else None)
+
+def _build_checklist_form(fecha=None):
+    form = OperationChecklistForm()
+    if not form.items.entries:  # inicializar
+        for idx, (servicio, responsable, hora) in enumerate(CHECKLIST_SERVICIOS_BASE):
+            subf = {}
+            form.items.append_entry(subf)
+            entry = form.items.entries[-1]
+            entry.form.servicio.data = servicio
+            entry.form.responsable.data = responsable
+            entry.form.hora_objetivo.data = hora
+            entry.form._idx.data = str(idx)
+    if fecha:
+        form.fecha.data = fecha
+    return form
+
+@web_bp.route('/checklists/nuevo', methods=['GET','POST'])
+@roles_required('admin','user')
+def checklist_nuevo():
+    from datetime import date
+    form = _build_checklist_form(date.today())
+    if form.validate_on_submit():
+        chk = OperationChecklist(
+            fecha=form.fecha.data or date.today(),
+            comentarios=form.comentarios.data,
+            usuario_id=current_user.id,
+        )
+        for entry in form.items.entries:
+            item = OperationChecklistItem(
+                servicio=entry.form.servicio.data,
+                responsable=entry.form.responsable.data,
+                hora_objetivo=entry.form.hora_objetivo.data,
+                estado=entry.form.estado.data,
+                observacion=entry.form.observacion.data,
+            )
+            chk.items.append(item)
+        db.session.add(chk)
+        db.session.commit()
+        flash('Checklist guardado','success')
+        log_event('checklist_create', current_user.id, 'OperationChecklist', chk.id, ip=request.remote_addr)
+        return redirect(url_for('web.checklist_historial'))
+    return render_template('checklist_form.html', form=form)
+
+@web_bp.route('/checklists/<int:chk_id>')
+@roles_required('admin','user')
+def checklist_ver(chk_id):
+    chk = OperationChecklist.query.get_or_404(chk_id)
+    return render_template('checklist_ver.html', chk=chk)
+
 
 @api_bp.route('/inventario/<int:item_id>/cerrar', methods=['POST'])
 @csrf.exempt

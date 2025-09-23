@@ -13,7 +13,7 @@
   <body class="d-flex flex-column h-100">
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary" role="navigation" aria-label="Navegación principal">
       <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('web.index') }}">Inventario</a>
+  <a class="navbar-brand" href="{{ url_for('web.index') }}">Inventario <span class="badge text-bg-light" style="font-size:0.65rem; vertical-align:middle;">vCheck</span></a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarsExample" aria-controls="navbarsExample" aria-expanded="false" aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>
@@ -22,6 +22,7 @@
             <li class="nav-item"><a class="nav-link" href="{{ url_for('web.inventario_listar') }}">Listado</a></li>
             {% if current_user.is_authenticated %}
               <li class="nav-item"><a class="nav-link" href="{{ url_for('web.inventario_nuevo') }}">Nuevo</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('web.checklist_historial') }}">Checklists</a></li>
               {% if current_user.role == 'admin' %}
                 <li class="nav-item"><a class="nav-link" href="{{ url_for('web.usuarios_listar') }}">Usuarios</a></li>
                 <li class="nav-item"><a class="nav-link" href="{{ url_for('web.locales_listar') }}">Locales</a></li>

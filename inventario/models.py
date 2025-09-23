@@ -118,3 +118,49 @@ class LocalRef(db.Model):
             'local': self.local,
             'farmacia': self.farmacia,
         }
+
+
+# --- Checklist Operación Diaria ---
+
+class OperationChecklist(db.Model):
+    """Registro diario de checklist de operación.
+
+    Un registro por día (o múltiples si se desea) con colección de items.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, index=True, default=datetime.utcnow().date)
+    comentarios = db.Column(db.Text)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    usuario = db.relationship('User', backref='operation_checklists')
+    items = db.relationship('OperationChecklistItem', backref='checklist', cascade='all, delete-orphan')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'fecha': self.fecha.isoformat() if self.fecha else None,
+            'comentarios': self.comentarios,
+            'usuario_id': self.usuario_id,
+            'items': [i.to_dict() for i in self.items],
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class OperationChecklistItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    checklist_id = db.Column(db.Integer, db.ForeignKey('operation_checklist.id'), index=True, nullable=False)
+    servicio = db.Column(db.String(200), index=True)
+    responsable = db.Column(db.String(120))
+    hora_objetivo = db.Column(db.String(40))  # texto libre "6am", "7am y 9am" etc
+    estado = db.Column(db.String(20), default='Pendiente')  # Pendiente / OK / Alerta
+    observacion = db.Column(db.Text)
+
+    def to_dict(self):
+        return {
+            'servicio': self.servicio,
+            'responsable': self.responsable,
+            'hora_objetivo': self.hora_objetivo,
+            'estado': self.estado,
+            'observacion': self.observacion,
+        }

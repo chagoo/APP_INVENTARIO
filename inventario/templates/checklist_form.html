@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Nuevo Checklist | {{ super() }}{% endblock %}
+{% block content %}
+<h3>Checklist Operación Diaria - Nuevo</h3>
+<form method="post" novalidate>
+  {{ form.hidden_tag() }}
+  <div class="row mb-3">
+    <div class="col-md-3">{{ form.fecha.label(class='form-label') }} {{ form.fecha(class='form-control') }}</div>
+    <div class="col-md-9">{{ form.comentarios.label(class='form-label') }} {{ form.comentarios(class='form-control', rows=2) }}</div>
+  </div>
+  <div class="table-responsive mb-3">
+    <table class="table table-sm table-bordered align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width:30%">Servicio</th>
+          <th style="width:15%">Responsable</th>
+          <th style="width:10%">Hora</th>
+          <th style="width:15%">Estado</th>
+          <th>Observación</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for sub in form.items %}
+        <tr>
+          <td>{{ sub.servicio.data }}{{ sub._idx }}</td>
+          <td>{{ sub.responsable.data }}</td>
+          <td>{{ sub.hora_objetivo.data }}</td>
+          <td>{{ sub.estado(class='form-select form-select-sm') }}</td>
+          <td>{{ sub.observacion(class='form-control form-control-sm', rows=1) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="text-end">{{ form.submit(class='btn btn-primary') }}</div>
+</form>
+{% endblock %}
