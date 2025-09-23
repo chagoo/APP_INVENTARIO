@@ -228,6 +228,7 @@ def inventario_eliminar(item_id):
     return redirect(url_for('web.inventario_listar'))
 
 @web_bp.route('/inventario', methods=['GET','POST'])
+@roles_required('admin','user')
 def inventario_listar():
     form = SearchForm()
     page = request.args.get('page', 1, type=int)
