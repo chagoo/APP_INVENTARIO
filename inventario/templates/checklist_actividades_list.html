@@ -3,7 +3,12 @@
 {% block content %}
 <h3 class="mb-3">Actividades del Checklist</h3>
 <p class="small text-muted">Este catálogo define las filas que aparecen al crear un nuevo checklist. Si no hay actividades activas, se usa la lista estática inicial.</p>
-<div class="mb-3"><a href="{{ url_for('web.checklist_actividad_nueva') }}" class="btn btn-sm btn-success">Nueva Actividad</a> <a href="{{ url_for('web.checklist_historial') }}" class="btn btn-sm btn-secondary">Volver</a></div>
+<div class="mb-3 d-flex flex-wrap gap-2">
+  <a href="{{ url_for('web.checklist_actividad_nueva') }}" class="btn btn-sm btn-success">Nueva Actividad</a>
+  <a href="{{ url_for('web.checklist_actividades_importar') }}" class="btn btn-sm btn-outline-primary">Importar CSV</a>
+  <a href="{{ url_for('web.checklist_actividades_csv') }}" class="btn btn-sm btn-outline-secondary">Exportar CSV</a>
+  <a href="{{ url_for('web.checklist_historial') }}" class="btn btn-sm btn-secondary">Volver</a>
+</div>
 <div class="table-responsive">
 <table class="table table-sm table-striped align-middle">
   <thead class="table-light"><tr><th>ID</th><th>Servicio</th><th>Responsable</th><th>Hora</th><th>Orden</th><th>Activo</th><th>Acciones</th></tr></thead>
@@ -18,10 +23,12 @@
       <td>{{ 'Sí' if a.activo else 'No' }}</td>
       <td class="text-nowrap">
         <a class="btn btn-sm btn-outline-primary" href="{{ url_for('web.checklist_actividad_editar', act_id=a.id) }}">Editar</a>
+        {% if current_user.role == 'admin' %}
         <form method="POST" action="{{ url_for('web.checklist_actividad_eliminar', act_id=a.id) }}" class="d-inline" onsubmit="return confirm('¿Eliminar actividad?');">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-sm btn-outline-danger">Eliminar</button>
         </form>
+        {% endif %}
       </td>
     </tr>
   {% endfor %}

@@ -5,6 +5,10 @@ from flask_cors import CORS
 from flask_login import LoginManager
 from pathlib import Path
 import os
+try:
+    from dotenv import load_dotenv  # type: ignore
+except ImportError:  # librería opcional
+    load_dotenv = None
 
 db = SQLAlchemy()
 csrf = CSRFProtect()
@@ -14,9 +18,34 @@ login_manager = LoginManager()
 def create_app(test_config=None):
     app = Flask(__name__, static_folder="static", template_folder="templates")
 
+    # Cargar variables desde .env si existe y la librería está disponible
+    if load_dotenv:
+        load_dotenv(override=False)
+
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
-    db_path = os.path.join(Path(__file__).parent, 'data.sqlite')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    # Permitir usar una base externa (por ejemplo SQL Server) mediante DATABASE_URL.
+    # Ejemplos:
+    #   MSSQL con ODBC Driver 17:
+    #   mssql+pyodbc://usuario:password@SERVIDOR/NombreBD?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes
+    #   PostgreSQL: postgresql://user:pass@host:5432/dbname
+    # Si no se define DATABASE_URL, se cae a SQLite local.
+    external_url = os.environ.get('DATABASE_URL')
+    if not external_url:
+        # Construir desde componentes SQL_* si se proporcionan
+        srv = os.environ.get('SQL_SERVER')
+        usr = os.environ.get('SQL_USER')
+        pwd = os.environ.get('SQL_PASSWORD')
+        dbn = os.environ.get('SQL_DBNAME')
+        drv = os.environ.get('SQL_DRIVER', 'ODBC Driver 17 for SQL Server')
+        if srv and usr and pwd and dbn:
+            from urllib.parse import quote_plus
+            # codificar password y driver
+            external_url = f"mssql+pyodbc://{quote_plus(usr)}:{quote_plus(pwd)}@{srv}/{dbn}?driver={quote_plus(drv)}&TrustServerCertificate=yes"
+    if external_url:
+        app.config['SQLALCHEMY_DATABASE_URI'] = external_url
+    else:
+        db_path = os.path.join(Path(__file__).parent, 'data.sqlite')
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['API_TOKEN'] = os.environ.get('API_TOKEN')
 
@@ -30,23 +59,43 @@ def create_app(test_config=None):
     login_manager.login_view = 'web.login'
 
     with app.app_context():
-        # Importar modelos antes de crear tablas para que todos estén registrados (incluye LocalRef)
         from . import models  # noqa: F401
-        db.create_all()  # crea tablas faltantes sin tocar las existentes
-        _ensure_user_new_columns()  # asegurar columnas nuevas en user
+        # Sólo ejecutar create_all y migración ligera si estamos en SQLite local.
+        if not external_url or app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite:'):
+            db.create_all()
+            _ensure_user_new_columns()
+        else:
+            # En bases externas asumimos que el esquema ya existe (o se maneja con migraciones externas).
+            masked = app.config['SQLALCHEMY_DATABASE_URI']
+            if '://' in masked:
+                # enmascarar password si formato tradicional mssql+pyodbc://user:pass@host
+                try:
+                    proto, rest = masked.split('://',1)
+                    creds_host = rest.split('@',1)
+                    if len(creds_host)==2 and ':' in creds_host[0]:
+                        user_part, host_part = creds_host[0], creds_host[1]
+                        u, p = user_part.split(':',1)
+                        masked = f"{proto}://{u}:***@{host_part}"
+                except Exception:
+                    pass
+            app.logger.info('Usando base externa (no create_all): %s', masked)
         from .routes import web_bp, api_bp
         app.register_blueprint(web_bp)
         app.register_blueprint(api_bp, url_prefix="/api")
         # Seed default admin si no hay usuarios
         from .models import User
         if User.query.count() == 0 and not app.config.get('TESTING'):
-            default_user = os.environ.get('ADMIN_USER', 'admin')
-            default_pass = os.environ.get('ADMIN_PASS', 'admin')
-            u = User(username=default_user, role='admin')
-            u.set_password(default_pass)
-            db.session.add(u)
-            db.session.commit()
-            app.logger.info(f"Usuario admin creado: {default_user} (cambia la contraseña ASAP)")
+            # Solo auto-seed en entorno SQLite local para conveniencia de desarrollo.
+            if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite:'):
+                default_user = os.environ.get('ADMIN_USER', 'admin')
+                default_pass = os.environ.get('ADMIN_PASS', 'admin')
+                u = User(username=default_user, role='admin')
+                u.set_password(default_pass)
+                db.session.add(u)
+                db.session.commit()
+                app.logger.info(f"Usuario admin creado: {default_user} (cambia la contraseña ASAP)")
+            else:
+                app.logger.info('Base externa sin usuarios: usar /bootstrap para crear el primer admin.')
 
     # Registrar comandos CLI
     register_cli(app)

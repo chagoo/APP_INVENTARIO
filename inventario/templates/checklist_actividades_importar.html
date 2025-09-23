@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Importar Actividades | {{ super() }}{% endblock %}
+{% block content %}
+<h3 class="mb-3">Importar Actividades del Checklist</h3>
+<p class="text-muted small">Sube un archivo CSV con encabezados: <code>servicio,responsable,hora_objetivo,orden,activo</code> (orden y activo opcionales). Se actualizarán actividades existentes por <strong>servicio</strong>.</p>
+<div class="mb-3">
+  <a href="{{ url_for('web.checklist_actividades_list') }}" class="btn btn-sm btn-secondary">Volver</a>
+  <a href="{{ url_for('web.checklist_actividades_csv') }}" class="btn btn-sm btn-outline-primary">Descargar Catálogo Actual</a>
+  <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse" data-bs-target="#ayudaEjemplo">Ver Ejemplo</button>
+</div>
+<div class="collapse" id="ayudaEjemplo">
+<pre class="bg-light p-2 small border">servicio,responsable,hora_objetivo,orden,activo
+Verificar Servidor A,Soporte,06:00,1,1
+Reinicio Proceso X,Operaciones,07:30,2,1
+Tarea Desactivada,,08:00,3,0</pre>
+</div>
+<form method="POST" enctype="multipart/form-data" class="mt-3">
+  <div class="mb-3">
+    <label class="form-label">Archivo CSV</label>
+    <input type="file" name="file" accept=".csv,text/csv" class="form-control" required>
+  </div>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="btn btn-primary">Importar</button>
+</form>
+{% endblock %}

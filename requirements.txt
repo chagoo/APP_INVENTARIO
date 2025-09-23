@@ -6,3 +6,5 @@ WTForms==3.1.1
 Flask-Login==0.6.3
 pytest==7.4.2
 waitress==3.0.0
+pyodbc==5.1.0  # Para conexión a SQL Server mediante mssql+pyodbc
+python-dotenv==1.0.1  # Carga de variables desde archivo .env

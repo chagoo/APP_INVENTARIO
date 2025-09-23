@@ -60,6 +60,9 @@ def health():
 @web_bp.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
+    # Si no hay usuarios aún, redirigir al bootstrap
+    if User.query.count() == 0:
+        return redirect(url_for('web.bootstrap_admin'))
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
         if not user:
@@ -80,7 +83,29 @@ def login():
                 db.session.commit()
                 log_event('login_failed', user.id if user else None, ip=request.remote_addr)
                 flash('Credenciales inválidas', 'danger')
-    return render_template('login.html', form=form)
+    return render_template('login.html', form=form, User=User)
+
+@web_bp.route('/bootstrap', methods=['GET','POST'])
+def bootstrap_admin():
+    """Crear el primer usuario admin si la tabla user está vacía.
+
+    Expuesto sólo mientras no existan usuarios. Una vez creado redirige a login.
+    """
+    if User.query.count() > 0:
+        return redirect(url_for('web.login'))
+    form = UserCreateForm(role='admin')
+    # Forzar rol admin y ocultar selección en template (se maneja en template condicionalmente).
+    if request.method == 'POST':
+        # Forzar rol admin aunque el formulario lo traiga distinto
+        form.role.data = 'admin'
+        if form.validate_on_submit():
+            u = User(username=form.username.data, role='admin')
+            u.set_password(form.password.data)
+            db.session.add(u)
+            db.session.commit()
+            flash('Usuario admin creado. Ahora puedes iniciar sesión.','success')
+            return redirect(url_for('web.login'))
+    return render_template('bootstrap_admin.html', form=form)
 
 
 @web_bp.route('/logout')
@@ -652,13 +677,13 @@ def checklist_editar(chk_id):
 
 # ---- Administración de actividades del checklist ----
 @web_bp.route('/checklists/actividades')
-@roles_required('admin')
+@roles_required('admin','user')
 def checklist_actividades_list():
     acts = ChecklistActividad.query.order_by(ChecklistActividad.activo.desc(), ChecklistActividad.orden, ChecklistActividad.id).all()
     return render_template('checklist_actividades_list.html', actividades=acts)
 
 @web_bp.route('/checklists/actividades/nueva', methods=['GET','POST'])
-@roles_required('admin')
+@roles_required('admin','user')
 def checklist_actividad_nueva():
     from .forms import ChecklistActividadForm
     form = ChecklistActividadForm()
@@ -677,7 +702,7 @@ def checklist_actividad_nueva():
     return render_template('checklist_actividad_form.html', form=form, modo='nueva')
 
 @web_bp.route('/checklists/actividades/<int:act_id>/editar', methods=['GET','POST'])
-@roles_required('admin')
+@roles_required('admin','user')
 def checklist_actividad_editar(act_id):
     from .forms import ChecklistActividadForm
     act = ChecklistActividad.query.get_or_404(act_id)
@@ -701,6 +726,109 @@ def checklist_actividad_eliminar(act_id):
     db.session.commit()
     flash('Actividad eliminada','success')
     return redirect(url_for('web.checklist_actividades_list'))
+
+@web_bp.route('/checklists/actividades/csv')
+@roles_required('admin','user')
+def checklist_actividades_csv():
+    """Exporta el catálogo actual de actividades a CSV."""
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['servicio','responsable','hora_objetivo','orden','activo'])
+    for a in ChecklistActividad.query.order_by(ChecklistActividad.orden, ChecklistActividad.id).all():
+        writer.writerow([
+            a.servicio,
+            a.responsable or '',
+            a.hora_objetivo or '',
+            a.orden or 0,
+            '1' if a.activo else '0'
+        ])
+    data = '\ufeff' + output.getvalue()
+    bio = BytesIO(data.encode('utf-8'))
+    bio.seek(0)
+    return send_file(bio, mimetype='text/csv; charset=utf-8', as_attachment=True, download_name='checklist_actividades.csv')
+
+@web_bp.route('/checklists/actividades/importar', methods=['GET','POST'])
+@roles_required('admin','user')
+def checklist_actividades_importar():
+    """Importación masiva de actividades desde un CSV.
+
+    Columnas esperadas (en cualquier orden, encabezado obligatorio):
+    servicio,responsable,hora_objetivo,orden,activo
+    - activo admite: 1/0, si/no, true/false (case-insensitive)
+    - orden se convierte a entero (default 0)
+    """
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if not file or file.filename == '':
+            flash('Archivo no seleccionado','warning')
+            return redirect(request.url)
+        try:
+            content = file.read().decode('utf-8-sig')
+        except UnicodeDecodeError:
+            try:
+                file.seek(0)
+                content = file.read().decode('latin-1')
+            except Exception:
+                flash('No se pudo leer el archivo (encoding)','danger')
+                return redirect(request.url)
+        reader = csv.reader(content.splitlines())
+        header = next(reader, [])
+        header_norm = [h.strip().lower() for h in header]
+        required = ['servicio']
+        if not all(r in header_norm for r in required):
+            flash('Encabezado debe incluir al menos la columna servicio','danger')
+            return redirect(request.url)
+        idx = {name: header_norm.index(name) for name in header_norm}
+        creados = 0
+        actualizados = 0
+        for row in reader:
+            if not row:
+                continue
+            try:
+                servicio = row[idx['servicio']].strip()
+            except Exception:
+                continue
+            if not servicio:
+                continue
+            responsable = row[idx['responsable']].strip() if 'responsable' in idx and len(row) > idx['responsable'] else None
+            hora = row[idx['hora_objetivo']].strip() if 'hora_objetivo' in idx and len(row) > idx['hora_objetivo'] else None
+            orden_val = 0
+            if 'orden' in idx and len(row) > idx['orden']:
+                try:
+                    orden_val = int(row[idx['orden']].strip() or '0')
+                except ValueError:
+                    orden_val = 0
+            activo_val = True
+            if 'activo' in idx and len(row) > idx['activo']:
+                raw_act = row[idx['activo']].strip().lower()
+                if raw_act in ('0','no','false','f','n'):
+                    activo_val = False
+                else:
+                    activo_val = True
+            # Si ya existe un registro exacto para el servicio, actualizar campos
+            existente = ChecklistActividad.query.filter_by(servicio=servicio).first()
+            if existente:
+                existente.responsable = responsable or None
+                existente.hora_objetivo = hora or None
+                existente.orden = orden_val
+                existente.activo = activo_val
+                actualizados += 1
+            else:
+                db.session.add(ChecklistActividad(
+                    servicio=servicio,
+                    responsable=responsable or None,
+                    hora_objetivo=hora or None,
+                    orden=orden_val,
+                    activo=activo_val
+                ))
+                creados += 1
+        db.session.commit()
+        flash(f'Importación completada. {creados} creados, {actualizados} actualizados','success')
+        total = creados + actualizados
+        if total:
+            log_event('checklist_actividades_import_csv', current_user.id, 'ChecklistActividad', meta=f'{creados} nuevos, {actualizados} actualizados', ip=request.remote_addr)
+        return redirect(url_for('web.checklist_actividades_list'))
+    return render_template('checklist_actividades_importar.html')
 
 @web_bp.route('/checklists/<int:chk_id>/eliminar', methods=['POST'])
 @roles_required('admin')
