@@ -3,7 +3,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from . import db, csrf
 from .models import Inventario, User, AuditLog
 from .forms import InventarioForm, SearchForm, LoginForm, UserCreateForm, UserEditForm, LocalRefForm, OperationChecklistForm
-from .models import LocalRef, OperationChecklist, OperationChecklistItem
+from .models import LocalRef, OperationChecklist, OperationChecklistItem, ChecklistActividad
 from .locales_data import CHECKLIST_SERVICIOS_BASE
 from io import StringIO, BytesIO
 import csv
@@ -542,17 +542,27 @@ def api_inventario_create():
 @roles_required('admin','user')
 def checklist_historial():
     page = request.args.get('page', 1, type=int)
-    paginated = OperationChecklist.query.order_by(OperationChecklist.fecha.desc(), OperationChecklist.id.desc()).paginate(page=page, per_page=15)
+    fecha = request.args.get('fecha','').strip()
+    query = OperationChecklist.query
+    if fecha:
+        try:
+            f = datetime.strptime(fecha, '%Y-%m-%d').date()
+            query = query.filter(OperationChecklist.fecha==f)
+        except ValueError:
+            flash('Fecha inválida, use formato YYYY-MM-DD','warning')
+    paginated = query.order_by(OperationChecklist.fecha.desc(), OperationChecklist.id.desc()).paginate(page=page, per_page=15)
     return render_template('checklist_list.html', registros=paginated.items, page=page,
                            next_page=paginated.next_num if paginated.has_next else None,
-                           prev_page=paginated.prev_num if paginated.has_prev else None)
+                           prev_page=paginated.prev_num if paginated.has_prev else None,
+                           filtro_fecha=fecha)
 
 def _build_checklist_form(fecha=None):
     form = OperationChecklistForm()
     if not form.items.entries:  # inicializar
-        for idx, (servicio, responsable, hora) in enumerate(CHECKLIST_SERVICIOS_BASE):
-            subf = {}
-            form.items.append_entry(subf)
+        actividades = ChecklistActividad.query.filter_by(activo=True).order_by(ChecklistActividad.orden, ChecklistActividad.id).all()
+        source = [(a.servicio, a.responsable, a.hora_objetivo) for a in actividades] if actividades else CHECKLIST_SERVICIOS_BASE
+        for idx, (servicio, responsable, hora) in enumerate(source):
+            form.items.append_entry({})
             entry = form.items.entries[-1]
             entry.form.servicio.data = servicio
             entry.form.responsable.data = responsable
@@ -593,7 +603,129 @@ def checklist_nuevo():
 @roles_required('admin','user')
 def checklist_ver(chk_id):
     chk = OperationChecklist.query.get_or_404(chk_id)
-    return render_template('checklist_ver.html', chk=chk)
+    from datetime import date
+    return render_template('checklist_ver.html', chk=chk, hoy=date.today())
+
+def _build_checklist_edit_form(chk: OperationChecklist):
+    form = OperationChecklistForm()
+    form.fecha.data = chk.fecha
+    form.comentarios.data = chk.comentarios
+    items_sorted = sorted(chk.items, key=lambda x: x.id)
+    for idx, it in enumerate(items_sorted):
+        form.items.append_entry({})
+        entry = form.items.entries[-1]
+        entry.form.servicio.data = it.servicio
+        entry.form.responsable.data = it.responsable
+        entry.form.hora_objetivo.data = it.hora_objetivo
+        entry.form.estado.data = it.estado
+        entry.form.observacion.data = it.observacion
+        entry.form._idx.data = str(idx)
+    return form
+
+@web_bp.route('/checklists/<int:chk_id>/editar', methods=['GET','POST'])
+@roles_required('admin','user')
+def checklist_editar(chk_id):
+    from datetime import date
+    chk = OperationChecklist.query.get_or_404(chk_id)
+    if chk.fecha != date.today():
+        flash('Solo se pueden editar checklists del día actual','warning')
+        return redirect(url_for('web.checklist_ver', chk_id=chk.id))
+    form = _build_checklist_edit_form(chk)
+    if form.validate_on_submit():
+        # Actualización parcial: iterar por índice mientras existan model items
+        form.comentarios.data and setattr(chk, 'comentarios', form.comentarios.data)
+        items_sorted = sorted(chk.items, key=lambda x: x.id)
+        total = min(len(items_sorted), len(form.items.entries))
+        for i in range(total):
+            entry = form.items.entries[i]
+            model_item = items_sorted[i]
+            if entry.form.estado.data:
+                model_item.estado = entry.form.estado.data
+            # Observación puede estar vacía; se guarda tal cual (None si cadena vacía)
+            model_item.observacion = entry.form.observacion.data
+        db.session.commit()
+        flash('Checklist actualizado','success')
+        log_event('checklist_update', current_user.id, 'OperationChecklist', chk.id, ip=request.remote_addr)
+        return redirect(url_for('web.checklist_ver', chk_id=chk.id))
+    return render_template('checklist_form.html', form=form, modo='editar')
+
+# ---- Administración de actividades del checklist ----
+@web_bp.route('/checklists/actividades')
+@roles_required('admin')
+def checklist_actividades_list():
+    acts = ChecklistActividad.query.order_by(ChecklistActividad.activo.desc(), ChecklistActividad.orden, ChecklistActividad.id).all()
+    return render_template('checklist_actividades_list.html', actividades=acts)
+
+@web_bp.route('/checklists/actividades/nueva', methods=['GET','POST'])
+@roles_required('admin')
+def checklist_actividad_nueva():
+    from .forms import ChecklistActividadForm
+    form = ChecklistActividadForm()
+    if form.validate_on_submit():
+        act = ChecklistActividad(
+            servicio=form.servicio.data.strip(),
+            responsable=form.responsable.data.strip() if form.responsable.data else None,
+            hora_objetivo=form.hora_objetivo.data.strip() if form.hora_objetivo.data else None,
+            orden=form.orden.data or 0,
+            activo=True if form.activo.data=='1' else False
+        )
+        db.session.add(act)
+        db.session.commit()
+        flash('Actividad creada','success')
+        return redirect(url_for('web.checklist_actividades_list'))
+    return render_template('checklist_actividad_form.html', form=form, modo='nueva')
+
+@web_bp.route('/checklists/actividades/<int:act_id>/editar', methods=['GET','POST'])
+@roles_required('admin')
+def checklist_actividad_editar(act_id):
+    from .forms import ChecklistActividadForm
+    act = ChecklistActividad.query.get_or_404(act_id)
+    form = ChecklistActividadForm(servicio=act.servicio, responsable=act.responsable, hora_objetivo=act.hora_objetivo, orden=act.orden, activo='1' if act.activo else '0')
+    if form.validate_on_submit():
+        act.servicio = form.servicio.data.strip()
+        act.responsable = form.responsable.data.strip() if form.responsable.data else None
+        act.hora_objetivo = form.hora_objetivo.data.strip() if form.hora_objetivo.data else None
+        act.orden = form.orden.data or 0
+        act.activo = True if form.activo.data=='1' else False
+        db.session.commit()
+        flash('Actividad actualizada','success')
+        return redirect(url_for('web.checklist_actividades_list'))
+    return render_template('checklist_actividad_form.html', form=form, modo='editar', actividad=act)
+
+@web_bp.route('/checklists/actividades/<int:act_id>/eliminar', methods=['POST'])
+@roles_required('admin')
+def checklist_actividad_eliminar(act_id):
+    act = ChecklistActividad.query.get_or_404(act_id)
+    db.session.delete(act)
+    db.session.commit()
+    flash('Actividad eliminada','success')
+    return redirect(url_for('web.checklist_actividades_list'))
+
+@web_bp.route('/checklists/<int:chk_id>/eliminar', methods=['POST'])
+@roles_required('admin')
+def checklist_eliminar(chk_id):
+    chk = OperationChecklist.query.get_or_404(chk_id)
+    db.session.delete(chk)
+    db.session.commit()
+    flash('Checklist eliminado','success')
+    log_event('checklist_delete', current_user.id, 'OperationChecklist', chk.id, ip=request.remote_addr)
+    return redirect(url_for('web.checklist_historial'))
+
+@web_bp.route('/checklists/csv')
+@roles_required('admin')
+def checklist_csv():
+    # Export simple: fecha, usuario, servicio, responsable, hora_objetivo, estado, observacion
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['fecha','usuario','servicio','responsable','hora_objetivo','estado','observacion'])
+    for chk in OperationChecklist.query.order_by(OperationChecklist.fecha.desc(), OperationChecklist.id.desc()).limit(1000):
+        user = chk.usuario.username if getattr(chk, 'usuario', None) else ''
+        for item in chk.items:
+            writer.writerow([chk.fecha, user, item.servicio, item.responsable, item.hora_objetivo, item.estado, (item.observacion or '').replace('\n',' ')])
+    data = '\ufeff' + output.getvalue()
+    bio = BytesIO(data.encode('utf-8'))
+    bio.seek(0)
+    return send_file(bio, mimetype='text/csv; charset=utf-8', as_attachment=True, download_name='checklists.csv')
 
 
 @api_bp.route('/inventario/<int:item_id>/cerrar', methods=['POST'])

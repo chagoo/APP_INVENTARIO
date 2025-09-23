@@ -85,3 +85,12 @@ class OperationChecklistForm(FlaskForm):
     comentarios = TextAreaField('Comentarios', validators=[Optional(), Length(max=1000)])
     items = FieldList(FormField(OperationChecklistItemForm))
     submit = SubmitField('Guardar Checklist')
+
+
+class ChecklistActividadForm(FlaskForm):
+    servicio = StringField('Servicio', validators=[DataRequired(), Length(max=200)])
+    responsable = StringField('Responsable', validators=[Optional(), Length(max=120)])
+    hora_objetivo = StringField('Hora Objetivo', validators=[Optional(), Length(max=40)])
+    orden = IntegerField('Orden', validators=[Optional()])
+    activo = SelectField('Activo', choices=[('1','Sí'),('0','No')])
+    submit = SubmitField('Guardar')

@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Editar' if modo=='editar' else 'Nueva' }} Actividad | {{ super() }}{% endblock %}
+{% block content %}
+<h3>{{ 'Editar' if modo=='editar' else 'Nueva' }} Actividad</h3>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">{{ form.servicio.label(class='form-label') }} {{ form.servicio(class='form-control') }}</div>
+    <div class="col-md-3">{{ form.responsable.label(class='form-label') }} {{ form.responsable(class='form-control') }}</div>
+    <div class="col-md-3">{{ form.hora_objetivo.label(class='form-label') }} {{ form.hora_objetivo(class='form-control') }}</div>
+    <div class="col-md-2">{{ form.orden.label(class='form-label') }} {{ form.orden(class='form-control') }}</div>
+    <div class="col-md-2">{{ form.activo.label(class='form-label') }} {{ form.activo(class='form-select') }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    {{ form.submit(class='btn btn-primary') }}
+    <a href="{{ url_for('web.checklist_actividades_list') }}" class="btn btn-secondary">Volver</a>
+  </div>
+</form>
+{% endblock %}

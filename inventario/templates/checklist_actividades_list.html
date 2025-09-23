@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Actividades Checklist | {{ super() }}{% endblock %}
+{% block content %}
+<h3 class="mb-3">Actividades del Checklist</h3>
+<p class="small text-muted">Este catálogo define las filas que aparecen al crear un nuevo checklist. Si no hay actividades activas, se usa la lista estática inicial.</p>
+<div class="mb-3"><a href="{{ url_for('web.checklist_actividad_nueva') }}" class="btn btn-sm btn-success">Nueva Actividad</a> <a href="{{ url_for('web.checklist_historial') }}" class="btn btn-sm btn-secondary">Volver</a></div>
+<div class="table-responsive">
+<table class="table table-sm table-striped align-middle">
+  <thead class="table-light"><tr><th>ID</th><th>Servicio</th><th>Responsable</th><th>Hora</th><th>Orden</th><th>Activo</th><th>Acciones</th></tr></thead>
+  <tbody>
+  {% for a in actividades %}
+    <tr class="{% if not a.activo %}table-secondary{% endif %}">
+      <td>{{ a.id }}</td>
+      <td>{{ a.servicio }}</td>
+      <td>{{ a.responsable }}</td>
+      <td>{{ a.hora_objetivo }}</td>
+      <td>{{ a.orden }}</td>
+      <td>{{ 'Sí' if a.activo else 'No' }}</td>
+      <td class="text-nowrap">
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('web.checklist_actividad_editar', act_id=a.id) }}">Editar</a>
+        <form method="POST" action="{{ url_for('web.checklist_actividad_eliminar', act_id=a.id) }}" class="d-inline" onsubmit="return confirm('¿Eliminar actividad?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

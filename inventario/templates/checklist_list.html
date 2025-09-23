@@ -1,28 +1,54 @@
 {% extends 'base.html' %}
 {% block title %}Checklists | {{ super() }}{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3 class="mb-0">Historial Checklists</h3>
-  <a href="{{ url_for('web.checklist_nuevo') }}" class="btn btn-sm btn-success">Nuevo Checklist</a>
+<h3 class="mb-3">Historial Checklists</h3>
+<form class="row g-2 mb-3" method="GET" action="{{ url_for('web.checklist_historial') }}">
+  <div class="col-auto">
+    <input type="date" name="fecha" value="{{ filtro_fecha }}" class="form-control form-control-sm" />
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-primary btn-sm" type="submit">Buscar</button>
+  </div>
+  <div class="col-auto">
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('web.checklist_historial') }}">Limpiar</a>
+  </div>
+  {% if current_user.role == 'admin' %}
+  <div class="col-auto">
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('web.checklist_csv') }}">CSV</a>
+  </div>
+  {% endif %}
+  <div class="col-auto">
+    <a href="{{ url_for('web.checklist_nuevo') }}" class="btn btn-success btn-sm">Nuevo Checklist</a>
+  </div>
+</form>
+<div class="table-responsive">
+  <table class="table table-striped table-sm align-middle">
+    <thead class="table-light">
+      <tr><th>Fecha</th><th>Usuario</th><th>Items OK</th><th>Items Alerta</th><th>Acciones</th></tr>
+    </thead>
+    <tbody>
+    {% for r in registros %}
+      {% set ok = r.items|selectattr('estado','equalto','OK')|list|length %}
+      {% set alerta = r.items|selectattr('estado','equalto','Alerta')|list|length %}
+      <tr>
+        <td>{{ r.fecha }}</td>
+        <td>{{ r.usuario.username if r.usuario else '-' }}</td>
+        <td>{{ ok }}</td>
+        <td class="{{ 'text-danger fw-bold' if alerta>0 else '' }}">{{ alerta }}</td>
+        <td class="text-nowrap">
+          <a href="{{ url_for('web.checklist_ver', chk_id=r.id) }}" class="btn btn-sm btn-outline-primary">Ver</a>
+          {% if current_user.role == 'admin' %}
+          <form method="POST" action="{{ url_for('web.checklist_eliminar', chk_id=r.id) }}" class="d-inline" onsubmit="return confirm('¿Eliminar checklist?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
 </div>
-<table class="table table-striped table-sm">
-  <thead class="table-light">
-    <tr><th>Fecha</th><th>Usuario</th><th>Items OK</th><th>Items Alerta</th><th>Acciones</th></tr>
-  </thead>
-  <tbody>
-  {% for r in registros %}
-    {% set ok = r.items|selectattr('estado','equalto','OK')|list|length %}
-    {% set alerta = r.items|selectattr('estado','equalto','Alerta')|list|length %}
-    <tr>
-      <td>{{ r.fecha }}</td>
-      <td>{{ r.usuario.username if r.usuario else '-' }}</td>
-      <td>{{ ok }}</td>
-      <td class="{{ 'text-danger fw-bold' if alerta>0 else '' }}">{{ alerta }}</td>
-      <td><a href="{{ url_for('web.checklist_ver', chk_id=r.id) }}" class="btn btn-sm btn-outline-primary">Ver</a></td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
 <nav>
   <ul class="pagination pagination-sm">
     {% if prev_page %}<li class="page-item"><a class="page-link" href="?page={{ prev_page }}">«</a></li>{% endif %}

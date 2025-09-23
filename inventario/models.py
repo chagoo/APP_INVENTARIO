@@ -164,3 +164,25 @@ class OperationChecklistItem(db.Model):
             'estado': self.estado,
             'observacion': self.observacion,
         }
+
+
+# --- Catálogo dinámico de actividades del checklist ---
+class ChecklistActividad(db.Model):
+    __tablename__ = 'checklist_actividad'
+    id = db.Column(db.Integer, primary_key=True)
+    servicio = db.Column(db.String(200), nullable=False, index=True)
+    responsable = db.Column(db.String(120))
+    hora_objetivo = db.Column(db.String(40))
+    orden = db.Column(db.Integer, default=0, index=True)
+    activo = db.Column(db.Boolean, default=True, index=True)
+    creado_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'servicio': self.servicio,
+            'responsable': self.responsable,
+            'hora_objetivo': self.hora_objetivo,
+            'orden': self.orden,
+            'activo': self.activo,
+        }

@@ -16,6 +16,14 @@ body {
 
 .table-responsive { max-height:70vh; }
 
+.cell-static {
+  background: #f1f3f5;
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+.cell-static strong { font-weight:600; }
+.cell-static span { color:#555; }
+
 @media (max-width: 576px){
   table.table thead { position:sticky; top:0; background: var(--bs-body-bg); }
   .navbar-brand { font-size:1rem; }

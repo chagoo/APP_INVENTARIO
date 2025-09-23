@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% block title %}Nuevo Checklist | {{ super() }}{% endblock %}
+{% block title %}{{ 'Editar' if modo=='editar' else 'Nuevo' }} Checklist | {{ super() }}{% endblock %}
 {% block content %}
-<h3>Checklist Operación Diaria - Nuevo</h3>
+<h3>Checklist Operación Diaria - {{ 'Editar' if modo=='editar' else 'Nuevo' }}</h3>
 <form method="post" novalidate>
   {{ form.hidden_tag() }}
   <div class="row mb-3">
@@ -22,16 +22,26 @@
       <tbody>
       {% for sub in form.items %}
         <tr>
-          <td>{{ sub.servicio.data }}{{ sub._idx }}</td>
-          <td>{{ sub.responsable.data }}</td>
-          <td>{{ sub.hora_objetivo.data }}</td>
-          <td>{{ sub.estado(class='form-select form-select-sm') }}</td>
-          <td>{{ sub.observacion(class='form-control form-control-sm', rows=1) }}</td>
+          <td class="cell-static">
+            <input type="hidden" name="{{ sub.form.servicio.name }}" value="{{ sub.form.servicio.data }}">
+            <input type="hidden" name="{{ sub.form._idx.name }}" value="{{ sub.form._idx.data }}">
+            <strong>{{ sub.form.servicio.data }}</strong>
+          </td>
+          <td class="cell-static">
+            <input type="hidden" name="{{ sub.form.responsable.name }}" value="{{ sub.form.responsable.data }}">
+            <span>{{ sub.form.responsable.data }}</span>
+          </td>
+          <td class="cell-static">
+            <input type="hidden" name="{{ sub.form.hora_objetivo.name }}" value="{{ sub.form.hora_objetivo.data }}">
+            <span>{{ sub.form.hora_objetivo.data }}</span>
+          </td>
+          <td>{{ sub.form.estado(class='form-select form-select-sm') }}</td>
+          <td>{{ sub.form.observacion(class='form-control form-control-sm', rows=1, placeholder='Observación...') }}</td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
-  <div class="text-end">{{ form.submit(class='btn btn-primary') }}</div>
+  <div class="text-end">{{ form.submit(class='btn btn-primary', value=('Actualizar' if modo=='editar' else 'Guardar')) }}</div>
 </form>
 {% endblock %}

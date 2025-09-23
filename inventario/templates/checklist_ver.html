@@ -3,6 +3,11 @@
 {% block content %}
 <h3>Checklist Operación - {{ chk.fecha }}</h3>
 <p class="text-muted small">Capturado por: {{ chk.usuario.username if chk.usuario else 'N/A' }} — {{ chk.created_at }}</p>
+{% if chk.fecha == hoy %}
+<div class="mb-2">
+  <a href="{{ url_for('web.checklist_editar', chk_id=chk.id) }}" class="btn btn-sm btn-primary">Editar (hoy)</a>
+</div>
+{% endif %}
 {% if chk.comentarios %}<div class="alert alert-info py-2"><strong>Comentarios:</strong> {{ chk.comentarios }}</div>{% endif %}
 <div class="table-responsive">
   <table class="table table-bordered table-sm align-middle">
