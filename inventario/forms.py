@@ -75,6 +75,8 @@ class OperationChecklistItemForm(FlaskForm):
     responsable = StringField('Responsable')  # solo lectura
     hora_objetivo = StringField('Hora')  # solo lectura
     estado = SelectField('Estado', choices=CHECKLIST_ESTADO_CHOICES)
+    # operador se llenará como email seleccionado del catálogo
+    operador = SelectField('Operador', choices=[], validators=[Optional()])
     observacion = TextAreaField('Observación', validators=[Optional(), Length(max=500)])
     image_file = FileField('Img')
     # hidden para mantener orden
@@ -97,4 +99,26 @@ class ChecklistActividadForm(FlaskForm):
     imagen_file = FileField('Imagen (PNG/JPG)')
     # Mostrar o editar nombre existente (solo lectura cuando ya hay imagen)
     imagen_ref = StringField('Nombre Archivo', validators=[Optional(), Length(max=255)])
+    submit = SubmitField('Guardar')
+
+
+# --- Formulario NOC ---
+class NOCIncidentForm(FlaskForm):
+    fecha = DateField('Fecha', validators=[DataRequired()])
+    sucursal = StringField('Sucursal', validators=[DataRequired(), Length(max=200)])
+    ticket = StringField('Número de ticket', validators=[Optional(), Length(max=120)])
+    reporta = StringField('Persona que reporta', validators=[Optional(), Length(max=120)])
+    problema = TextAreaField('Problema reportado', validators=[Optional(), Length(max=2000)])
+    proveedor = StringField('Proveedor reportado', validators=[Optional(), Length(max=120)])
+    solucion = TextAreaField('Solución', validators=[Optional(), Length(max=2000)])
+    tiempo_solucion = StringField('Tiempo de solución', validators=[Optional(), Length(max=200)])
+    caida = SelectField('Farmacia caída', choices=[('','-'),('Sí','Sí'),('No','No')], validators=[Optional()])
+    submit = SubmitField('Guardar')
+
+
+# --- Formulario Operador ---
+class OperadorForm(FlaskForm):
+    nombre = StringField('Nombre', validators=[DataRequired(), Length(max=120)])
+    email = StringField('Email', validators=[DataRequired(), Length(max=200)])
+    activo = SelectField('Activo', choices=[('1','Sí'),('0','No')])
     submit = SubmitField('Guardar')

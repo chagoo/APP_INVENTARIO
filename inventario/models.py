@@ -104,6 +104,25 @@ class AuditLog(db.Model):
         }
 
 
+# --- Catálogo de Operadores ---
+class Operador(db.Model):
+    __tablename__ = 'operador'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(120), nullable=False, index=True)
+    email = db.Column(db.String(200), nullable=False, index=True)
+    activo = db.Column(db.Boolean, default=True, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nombre': self.nombre,
+            'email': self.email,
+            'activo': self.activo,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 class LocalRef(db.Model):
     """Catálogo de locales para autocompletar campos de Inventario."""
     id = db.Column(db.Integer, primary_key=True)
@@ -155,6 +174,7 @@ class OperationChecklistItem(db.Model):
     responsable = db.Column(db.String(120))
     hora_objetivo = db.Column(db.String(40))  # texto libre "6am", "7am y 9am" etc
     estado = db.Column(db.String(20), default='Pendiente')  # Pendiente / OK / Alerta
+    operador = db.Column(db.String(200))  # correo del operador que ejecuta la tarea
     observacion = db.Column(db.Text)
     imagen_ref = db.Column(db.String(255))
 
@@ -164,6 +184,7 @@ class OperationChecklistItem(db.Model):
             'responsable': self.responsable,
             'hora_objetivo': self.hora_objetivo,
             'estado': self.estado,
+            'operador': self.operador,
             'observacion': self.observacion,
             'imagen_ref': self.imagen_ref,
         }
@@ -191,4 +212,35 @@ class ChecklistActividad(db.Model):
             'orden': self.orden,
             'activo': self.activo,
             'imagen_ref': self.imagen_ref,
+        }
+
+
+# --- Bitácora de redes (NOC) ---
+class NOCIncident(db.Model):
+    __tablename__ = 'noc_incident'
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, index=True)
+    sucursal = db.Column(db.String(200), index=True)
+    ticket = db.Column(db.String(120), index=True)
+    reporta = db.Column(db.String(120))
+    problema = db.Column(db.Text)
+    proveedor = db.Column(db.String(120))
+    solucion = db.Column(db.Text)
+    tiempo_solucion = db.Column(db.String(200))
+    caida = db.Column(db.String(5), index=True)  # 'SÍ' / 'NO'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'fecha': self.fecha.isoformat() if self.fecha else None,
+            'sucursal': self.sucursal,
+            'ticket': self.ticket,
+            'reporta': self.reporta,
+            'problema': self.problema,
+            'proveedor': self.proveedor,
+            'solucion': self.solucion,
+            'tiempo_solucion': self.tiempo_solucion,
+            'caida': self.caida,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
         }

@@ -26,3 +26,55 @@
 2025-09-24 11:05:08,229 INFO waitress: Serving on http://0.0.0.0:8001
 2025-09-24 11:33:24,800 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
 2025-09-24 11:33:24,831 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-24 15:41:06,766 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-24 15:41:06,857 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-24 15:46:07,051 INFO flask_wtf.csrf: The CSRF token is missing.
+2025-09-24 15:56:15,231 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-24 15:56:15,262 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-24 16:12:01,571 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-24 16:12:01,664 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-24 16:53:09,902 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-24 16:53:09,921 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-24 16:54:01,788 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-24 16:54:01,814 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-24 16:59:12,396 ERROR inventario: Exception on /noc/importar [POST]
+Traceback (most recent call last):
+  File "E:\apps_github\APP_INVENTARIO\.venv\Lib\site-packages\flask\app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\apps_github\APP_INVENTARIO\.venv\Lib\site-packages\flask\app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\apps_github\APP_INVENTARIO\.venv\Lib\site-packages\flask_cors\extension.py", line 176, in wrapped_function
+    return cors_after_request(app.make_response(f(*args, **kwargs)))
+                                                ^^^^^^^^^^^^^^^^^^
+  File "E:\apps_github\APP_INVENTARIO\.venv\Lib\site-packages\flask\app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\apps_github\APP_INVENTARIO\.venv\Lib\site-packages\flask\app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\apps_github\APP_INVENTARIO\.venv\Lib\site-packages\flask_login\utils.py", line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\apps_github\APP_INVENTARIO\inventario\routes.py", line 69, in wrapped
+    return view(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "E:\apps_github\APP_INVENTARIO\inventario\routes.py", line 1199, in noc_importar
+    header = next(reader, [])
+             ^^^^^^^^^^^^^^^^
+_csv.Error: new-line character seen in unquoted field - do you need to open the file in universal-newline mode?
+2025-09-24 16:59:41,966 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-24 16:59:42,007 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-24 21:17:22,073 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-24 21:17:22,170 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-24 21:35:33,757 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-24 21:35:33,832 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-24 21:47:35,338 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-24 21:47:35,400 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-24 22:11:32,099 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-24 22:11:32,191 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-24 22:25:21,124 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-24 22:25:21,152 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-24 22:34:18,154 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-24 22:34:18,182 INFO waitress: Serving on http://0.0.0.0:8001

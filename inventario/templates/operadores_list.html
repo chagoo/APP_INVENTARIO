@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Operadores | {{ super() }}{% endblock %}
+{% block content %}
+<h3>Operadores</h3>
+<div class="mb-2 d-flex gap-2">
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('web.operadores_csv') }}">Exportar CSV</a>
+  {% if current_user.role == 'admin' %}
+    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('web.operadores_importar') }}">Importar CSV</a>
+    <a class="btn btn-sm btn-success" href="{{ url_for('web.operadores_nuevo') }}">Nuevo</a>
+  {% endif %}
+</div>
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead class="table-light"><tr><th>Nombre</th><th>Email</th><th>Activo</th><th>Acciones</th></tr></thead>
+    <tbody>
+    {% for o in operadores %}
+      <tr>
+        <td>{{ o.nombre }}</td>
+        <td>{{ o.email }}</td>
+        <td>{{ 'Sí' if o.activo else 'No' }}</td>
+        <td class="text-nowrap">
+          {% if current_user.role == 'admin' %}
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('web.operadores_editar', op_id=o.id) }}">Editar</a>
+            <form method="post" action="{{ url_for('web.operadores_eliminar', op_id=o.id) }}" class="d-inline" onsubmit="return confirm('¿Eliminar operador?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+            </form>
+          {% else %}-{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

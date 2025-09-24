@@ -16,7 +16,8 @@
           <th style="width:14%">Responsable</th>
           <th style="width:10%">Hora</th>
           <th style="width:10%">Imagen</th>
-          <th style="width:15%">Estado</th>
+          <th style="width:8%">Estado</th>
+          <th style="width:12%">Operador</th>
           <th>Observación</th>
         </tr>
       </thead>
@@ -46,6 +47,7 @@
             {{ sub.form.image_file(class='form-control form-control-sm', accept='.png,.jpg,.jpeg,.gif,.webp') }}
           </td>
           <td>{{ sub.form.estado(class='form-select form-select-sm') }}</td>
+          <td>{{ sub.form.operador(class='form-control form-control-sm', placeholder='usuario@correo') }}</td>
           <td>{{ sub.form.observacion(class='form-control form-control-sm', rows=1, placeholder='Observación...') }}</td>
         </tr>
       {% endfor %}

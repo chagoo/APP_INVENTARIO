@@ -24,6 +24,8 @@
               <li class="nav-item"><a class="nav-link" href="{{ url_for('web.inventario_listar') }}">Inventario</a></li>
               <li class="nav-item"><a class="nav-link" href="{{ url_for('web.checklist_historial') }}">Checklists</a></li>
               <li class="nav-item"><a class="nav-link" href="{{ url_for('web.checklist_actividades_list') }}">Actividades</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('web.noc_list') }}">NOC</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('web.operadores_list') }}">Operadores</a></li>
               {% if current_user.role == 'admin' %}
                 <li class="nav-item"><a class="nav-link" href="{{ url_for('web.usuarios_listar') }}">Usuarios</a></li>
                 <li class="nav-item"><a class="nav-link" href="{{ url_for('web.locales_listar') }}">Locales</a></li>

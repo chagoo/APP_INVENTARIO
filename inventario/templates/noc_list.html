@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}NOC | {{ super() }}{% endblock %}
+{% block content %}
+<h3 class="mb-3">Bitácora NOC</h3>
+<form class="row g-2 mb-3" method="GET" action="{{ url_for('web.noc_list') }}">
+  <div class="col-auto"><input type="date" name="fecha" value="{{ filtro_fecha }}" class="form-control form-control-sm" /></div>
+  <div class="col-auto"><input type="text" name="q" value="{{ q }}" placeholder="Buscar..." class="form-control form-control-sm"/></div>
+  <div class="col-auto"><button class="btn btn-primary btn-sm" type="submit">Buscar</button></div>
+  <div class="col-auto"><a class="btn btn-outline-secondary btn-sm" href="{{ url_for('web.noc_csv') }}">CSV</a></div>
+  <div class="col-auto"><a class="btn btn-outline-secondary btn-sm" href="{{ url_for('web.noc_plantilla') }}">Descargar plantilla</a></div>
+  <div class="col-auto"><a class="btn btn-outline-primary btn-sm" href="{{ url_for('web.noc_importar') }}">Importar CSV</a></div>
+  <div class="col-auto"><a href="{{ url_for('web.noc_nuevo') }}" class="btn btn-success btn-sm">Nuevo</a></div>
+</form>
+<div class="table-responsive">
+  <table class="table table-striped table-sm align-middle">
+    <thead class="table-light"><tr>
+      <th>Fecha</th><th>Sucursal</th><th>Ticket</th><th>Reporta</th><th>Problema</th><th>Proveedor</th><th>Solución</th><th>Tiempo solución</th><th>Caída</th><th>Acciones</th>
+    </tr></thead>
+    <tbody>
+    {% for r in registros %}
+      <tr>
+        <td>{{ r.fecha }}</td>
+        <td>{{ r.sucursal }}</td>
+        <td>{{ r.ticket }}</td>
+        <td>{{ r.reporta }}</td>
+        <td style="white-space:pre-wrap">{{ r.problema }}</td>
+        <td>{{ r.proveedor }}</td>
+        <td style="white-space:pre-wrap">{{ r.solucion }}</td>
+        <td>{{ r.tiempo_solucion }}</td>
+        <td>{{ r.caida }}</td>
+        <td class="text-nowrap">
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('web.noc_editar', inc_id=r.id) }}">Editar</a>
+          {% if current_user.role == 'admin' %}
+          <form method="POST" action="{{ url_for('web.noc_eliminar', inc_id=r.id) }}" class="d-inline" onsubmit="return confirm('¿Eliminar incidente?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<nav>
+  <ul class="pagination pagination-sm">
+    {% if prev_page %}<li class="page-item"><a class="page-link" href="?page={{ prev_page }}">«</a></li>{% endif %}
+    <li class="page-item active"><span class="page-link">{{ page }}</span></li>
+    {% if next_page %}<li class="page-item"><a class="page-link" href="?page={{ next_page }}">»</a></li>{% endif %}
+  </ul>
+</nav>
+{% endblock %}

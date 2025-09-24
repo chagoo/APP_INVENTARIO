@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}Importar NOC | {{ super() }}{% endblock %}
+{% block content %}
+<h3>Importar incidentes NOC (CSV)</h3>
+<p class="text-muted small">Encabezados sugeridos: fecha, sucursal, ticket, reporta, problema, proveedor, solucion, tiempo_solucion, caida. Se admiten variantes con acentos. Puedes descargar la plantilla para Excel.</p>
+<p><a class="btn btn-outline-secondary btn-sm" href="{{ url_for('web.noc_plantilla') }}">Descargar plantilla</a></p>
+<form method="post" enctype="multipart/form-data">
+  <div class="mb-3">
+    <input type="file" name="file" accept=".csv" class="form-control" required />
+  </div>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="btn btn-primary" type="submit">Importar</button>
+  <a href="{{ url_for('web.noc_list') }}" class="btn btn-secondary">Volver</a>
+</form>
+{% endblock %}

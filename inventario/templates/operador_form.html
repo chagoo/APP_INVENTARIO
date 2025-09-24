@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Editar' if modo=='editar' else 'Nuevo' }} Operador | {{ super() }}{% endblock %}
+{% block content %}
+<h3>{{ 'Editar' if modo=='editar' else 'Nuevo' }} Operador</h3>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="row g-2 mb-3">
+    <div class="col-md-4">{{ form.nombre.label(class='form-label') }} {{ form.nombre(class='form-control') }}</div>
+    <div class="col-md-5">{{ form.email.label(class='form-label') }} {{ form.email(class='form-control', placeholder='usuario@dominio') }}</div>
+    <div class="col-md-3">{{ form.activo.label(class='form-label') }} {{ form.activo(class='form-select') }}</div>
+  </div>
+  <div class="text-end"><button class="btn btn-primary" type="submit">Guardar</button> <a class="btn btn-secondary" href="{{ url_for('web.operadores_list') }}">Volver</a></div>
+</form>
+{% endblock %}

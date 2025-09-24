@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}Vista previa importación NOC | {{ super() }}{% endblock %}
+{% block content %}
+<h3>Vista previa importación NOC</h3>
+<p class="text-muted small">Se detectaron {{ total }} filas. {{ con_ticket }} con ticket. Revisa un muestreo y confirma.</p>
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="token" value="{{ token }}">
+  <button class="btn btn-success" type="submit">Confirmar importación</button>
+  <a class="btn btn-secondary" href="{{ url_for('web.noc_importar') }}">Cancelar</a>
+</form>
+<div class="table-responsive mt-3">
+  <table class="table table-sm table-striped">
+    <thead class="table-light"><tr>
+      <th>Fecha</th><th>Sucursal</th><th>Ticket</th><th>Reporta</th><th>Problema</th><th>Proveedor</th><th>Solución</th><th>Tiempo solución</th><th>Caída</th>
+    </tr></thead>
+    <tbody>
+      {% for r in preview %}
+      <tr>
+        <td>{{ r.fecha }}</td>
+        <td>{{ r.sucursal }}</td>
+        <td>{{ r.ticket }}</td>
+        <td>{{ r.reporta }}</td>
+        <td style="white-space:pre-wrap">{{ r.problema }}</td>
+        <td>{{ r.proveedor }}</td>
+        <td style="white-space:pre-wrap">{{ r.solucion }}</td>
+        <td>{{ r.tiempo_solucion }}</td>
+        <td>{{ r.caida }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

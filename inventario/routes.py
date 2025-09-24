@@ -3,7 +3,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from . import db, csrf
 from .models import Inventario, User, AuditLog
 from .forms import InventarioForm, SearchForm, LoginForm, UserCreateForm, UserEditForm, LocalRefForm, OperationChecklistForm
-from .models import LocalRef, OperationChecklist, OperationChecklistItem, ChecklistActividad
+from .models import LocalRef, OperationChecklist, OperationChecklistItem, ChecklistActividad, NOCIncident, Operador
 from .locales_data import CHECKLIST_SERVICIOS_BASE
 from io import StringIO, BytesIO
 import csv
@@ -12,6 +12,7 @@ import secrets
 import hashlib
 from functools import wraps
 from PIL import Image
+import os
 
 MAX_IMAGE_BYTES = 500 * 1024  # 500 KB
 ALLOWED_FORMATS = {'PNG','JPEG','JPG','GIF','WEBP'}
@@ -615,7 +616,18 @@ def checklist_historial():
 
 def _build_checklist_form(fecha=None):
     form = OperationChecklistForm()
-    if not form.items.entries:  # inicializar
+    # cargar operadores activos como choices (email mostrado y guardado)
+    try:
+        ops = Operador.query.filter_by(activo=True).order_by(Operador.nombre).all()
+        choices = [('', '-')]+[(o.email, f"{o.nombre} — {o.email}") for o in ops]
+    except Exception:
+        choices = [('', '-')]
+    # email del usuario logueado para autoselección
+    try:
+        default_email = (current_user.email or '').strip()
+    except Exception:
+        default_email = ''
+    if not form.items.entries:  # inicializar (solo estructura básica)
         actividades = ChecklistActividad.query.filter_by(activo=True).order_by(ChecklistActividad.orden, ChecklistActividad.id).all()
         source = [(a.servicio, a.responsable, a.hora_objetivo) for a in actividades] if actividades else CHECKLIST_SERVICIOS_BASE
         for idx, (servicio, responsable, hora) in enumerate(source):
@@ -624,7 +636,18 @@ def _build_checklist_form(fecha=None):
             entry.form.servicio.data = servicio
             entry.form.responsable.data = responsable
             entry.form.hora_objetivo.data = hora
+            # set default solo en GET para no sobrescribir POST
+            if request.method != 'POST':
+                values = {v for v,_ in choices}
+                if default_email and default_email in values:
+                    entry.form.operador.data = default_email
             entry.form._idx.data = str(idx)
+    # Asegurar que todas las entradas tengan choices configurados (POST/GET)
+    for entry in form.items.entries:
+        try:
+            entry.form.operador.choices = choices
+        except Exception:
+            pass
     if fecha:
         form.fecha.data = fecha
     # También devolver mapping servicio->imagen_ref para mostrar en template
@@ -668,6 +691,7 @@ def checklist_nuevo():
                 responsable=entry.form.responsable.data,
                 hora_objetivo=entry.form.hora_objetivo.data,
                 estado=entry.form.estado.data,
+                operador=(entry.form.operador.data or None),
                 observacion=entry.form.observacion.data,
                 imagen_ref=img_filename
             )
@@ -688,20 +712,44 @@ def checklist_ver(chk_id):
 
 def _build_checklist_edit_form(chk: OperationChecklist):
     form = OperationChecklistForm()
-    form.fecha.data = chk.fecha
-    form.comentarios.data = chk.comentarios
+    try:
+        ops = Operador.query.filter_by(activo=True).order_by(Operador.nombre).all()
+        choices = [('', '-')]+[(o.email, f"{o.nombre} — {o.email}") for o in ops]
+    except Exception:
+        choices = [('', '-')]
+    try:
+        default_email = (current_user.email or '').strip()
+    except Exception:
+        default_email = ''
+    if request.method != 'POST':
+        form.fecha.data = chk.fecha
+        form.comentarios.data = chk.comentarios
     items_sorted = sorted(chk.items, key=lambda x: x.id)
     existing_services = set()
-    for idx, it in enumerate(items_sorted):
-        form.items.append_entry({})
-        entry = form.items.entries[-1]
-        entry.form.servicio.data = it.servicio
-        existing_services.add(it.servicio.strip().lower())
-        entry.form.responsable.data = it.responsable
-        entry.form.hora_objetivo.data = it.hora_objetivo
-        entry.form.estado.data = it.estado
-        entry.form.observacion.data = it.observacion
-        entry.form._idx.data = str(idx)
+    if request.method != 'POST':
+        # Construir entradas desde los items del modelo (GET)
+        for idx, it in enumerate(items_sorted):
+            form.items.append_entry({})
+            entry = form.items.entries[-1]
+            entry.form.servicio.data = it.servicio
+            existing_services.add(it.servicio.strip().lower())
+            entry.form.responsable.data = it.responsable
+            entry.form.hora_objetivo.data = it.hora_objetivo
+            entry.form.estado.data = it.estado
+            entry.form.operador.choices = choices
+            try:
+                entry.form.operador.data = it.operador or (default_email if default_email in {v for v,_ in choices} else '')
+            except Exception:
+                pass
+            entry.form.observacion.data = it.observacion
+            entry.form._idx.data = str(idx)
+    else:
+        # En POST, solo asegurar choices en entradas existentes del form
+        for entry in form.items.entries:
+            try:
+                entry.form.operador.choices = choices
+            except Exception:
+                pass
     # Detectar actividades nuevas activas que no están en el checklist
     nuevas = ChecklistActividad.query.filter_by(activo=True).order_by(ChecklistActividad.orden, ChecklistActividad.id).all()
     added = 0
@@ -710,16 +758,21 @@ def _build_checklist_edit_form(chk: OperationChecklist):
         key = act.servicio.strip().lower()
         if key in existing_services:
             continue
-        form.items.append_entry({})
-        entry = form.items.entries[-1]
-        entry.form.servicio.data = act.servicio
-        entry.form.responsable.data = act.responsable
-        entry.form.hora_objetivo.data = act.hora_objetivo
-        entry.form.estado.data = 'Pendiente'
-        entry.form.observacion.data = ''
-        entry.form._idx.data = str(base_idx + added)
-        added += 1
-        existing_services.add(key)
+        if request.method != 'POST':
+            form.items.append_entry({})
+            entry = form.items.entries[-1]
+            entry.form.servicio.data = act.servicio
+            entry.form.responsable.data = act.responsable
+            entry.form.hora_objetivo.data = act.hora_objetivo
+            entry.form.estado.data = 'Pendiente'
+            entry.form.observacion.data = ''
+            entry.form.operador.choices = choices
+            # autoselect solo en GET
+            if default_email and default_email in {v for v,_ in choices}:
+                entry.form.operador.data = default_email
+            entry.form._idx.data = str(base_idx + added)
+            added += 1
+            existing_services.add(key)
     return form
 
 @web_bp.route('/checklists/<int:chk_id>/editar', methods=['GET','POST'])
@@ -751,6 +804,7 @@ def checklist_editar(chk_id):
             model_item = items_sorted[i]
             if entry.form.estado.data:
                 model_item.estado = entry.form.estado.data
+            model_item.operador = (entry.form.operador.data or None)
             model_item.observacion = entry.form.observacion.data
             upload = entry.form.image_file.data
             if upload and getattr(upload, 'filename', None):
@@ -780,6 +834,7 @@ def checklist_editar(chk_id):
                 responsable=entry.form.responsable.data,
                 hora_objetivo=entry.form.hora_objetivo.data,
                 estado=entry.form.estado.data or 'Pendiente',
+                operador=(entry.form.operador.data or None),
                 observacion=entry.form.observacion.data,
             )
             upload = entry.form.image_file.data
@@ -1019,18 +1074,391 @@ def checklist_eliminar(chk_id):
 @web_bp.route('/checklists/csv')
 @roles_required('admin')
 def checklist_csv():
-    # Export incluye imagen_ref: fecha, usuario, servicio, responsable, hora_objetivo, estado, observacion, imagen_ref
+    # Export incluye imagen_ref y operador: fecha, usuario, servicio, responsable, hora_objetivo, estado, operador, observacion, imagen_ref
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(['fecha','usuario','servicio','responsable','hora_objetivo','estado','observacion','imagen_ref'])
+    writer.writerow(['fecha','usuario','servicio','responsable','hora_objetivo','estado','operador','observacion','imagen_ref'])
     for chk in OperationChecklist.query.order_by(OperationChecklist.fecha.desc(), OperationChecklist.id.desc()).limit(1000):
         user = chk.usuario.username if getattr(chk, 'usuario', None) else ''
         for item in chk.items:
-            writer.writerow([chk.fecha, user, item.servicio, item.responsable, item.hora_objetivo, item.estado, (item.observacion or '').replace('\n',' '), item.imagen_ref or ''])
+            writer.writerow([chk.fecha, user, item.servicio, item.responsable, item.hora_objetivo, item.estado, (item.operador or ''), (item.observacion or '').replace('\n',' '), item.imagen_ref or ''])
     data = '\ufeff' + output.getvalue()
     bio = BytesIO(data.encode('utf-8'))
     bio.seek(0)
     return send_file(bio, mimetype='text/csv; charset=utf-8', as_attachment=True, download_name='checklists.csv')
+
+
+# ---------------- Bitácora NOC ----------------
+@web_bp.route('/noc', methods=['GET'])
+@roles_required('admin','user')
+def noc_list():
+    q = request.args.get('q','').strip()
+    fecha = request.args.get('fecha','').strip()
+    page = request.args.get('page', 1, type=int)
+    per = 20
+    query = NOCIncident.query
+    if fecha:
+        try:
+            f = datetime.strptime(fecha, '%Y-%m-%d').date()
+            query = query.filter(NOCIncident.fecha==f)
+        except Exception:
+            flash('Fecha inválida','warning')
+    if q:
+        like = f"%{q}%"
+        query = query.filter((NOCIncident.sucursal.ilike(like)) | (NOCIncident.ticket.ilike(like)) | (NOCIncident.problema.ilike(like)))
+    pag = query.order_by(NOCIncident.fecha.desc(), NOCIncident.id.desc()).paginate(page=page, per_page=per)
+    return render_template('noc_list.html', registros=pag.items, page=page,
+                           next_page=pag.next_num if pag.has_next else None,
+                           prev_page=pag.prev_num if pag.has_prev else None,
+                           q=q, filtro_fecha=fecha)
+
+@web_bp.route('/noc/nuevo', methods=['GET','POST'])
+@roles_required('admin','user')
+def noc_nuevo():
+    from .forms import NOCIncidentForm
+    form = NOCIncidentForm()
+    if form.validate_on_submit():
+        inc = NOCIncident(
+            fecha=form.fecha.data,
+            sucursal=form.sucursal.data,
+            ticket=form.ticket.data,
+            reporta=form.reporta.data,
+            problema=form.problema.data,
+            proveedor=form.proveedor.data,
+            solucion=form.solucion.data,
+            tiempo_solucion=form.tiempo_solucion.data,
+            caida=form.caida.data or None,
+        )
+        db.session.add(inc)
+        db.session.commit()
+        flash('Incidente creado','success')
+        return redirect(url_for('web.noc_list'))
+    return render_template('noc_form.html', form=form, modo='nuevo')
+
+@web_bp.route('/noc/<int:inc_id>/editar', methods=['GET','POST'])
+@roles_required('admin','user')
+def noc_editar(inc_id):
+    from .forms import NOCIncidentForm
+    inc = NOCIncident.query.get_or_404(inc_id)
+    form = NOCIncidentForm(obj=inc)
+    if form.validate_on_submit():
+        form.populate_obj(inc)
+        db.session.commit()
+        flash('Incidente actualizado','success')
+        return redirect(url_for('web.noc_list'))
+    return render_template('noc_form.html', form=form, modo='editar', incidente=inc)
+
+@web_bp.route('/noc/<int:inc_id>/eliminar', methods=['POST'])
+@roles_required('admin')
+def noc_eliminar(inc_id):
+    inc = NOCIncident.query.get_or_404(inc_id)
+    db.session.delete(inc)
+    db.session.commit()
+    flash('Incidente eliminado','success')
+    return redirect(url_for('web.noc_list'))
+
+@web_bp.route('/noc/csv')
+@roles_required('admin','user')
+def noc_csv():
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['fecha','sucursal','ticket','reporta','problema','proveedor','solucion','tiempo_solucion','caida'])
+    for r in NOCIncident.query.order_by(NOCIncident.fecha.desc(), NOCIncident.id.desc()).limit(2000):
+        writer.writerow([
+            r.fecha.isoformat() if r.fecha else '', r.sucursal or '', r.ticket or '', r.reporta or '',
+            (r.problema or '').replace('\n',' '), r.proveedor or '', (r.solucion or '').replace('\n',' '), r.tiempo_solucion or '', r.caida or ''
+        ])
+    data = '\ufeff' + output.getvalue()
+    bio = BytesIO(data.encode('utf-8'))
+    bio.seek(0)
+    return send_file(bio, mimetype='text/csv; charset=utf-8', as_attachment=True, download_name='noc_incidentes.csv')
+
+@web_bp.route('/noc/plantilla')
+@roles_required('admin','user')
+def noc_plantilla():
+    """Descarga plantilla CSV con encabezados sugeridos y una fila de ejemplo vacía."""
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['fecha','sucursal','ticket','reporta','problema','proveedor','solucion','tiempo_solucion','caida'])
+    writer.writerow(['2025-09-24','M721 tesistan','INC0000012345','Nombre','SIN RED','Telmex','Descripción solución','1 hora','Sí'])
+    data = '\ufeff' + output.getvalue()
+    bio = BytesIO(data.encode('utf-8'))
+    bio.seek(0)
+    return send_file(bio, mimetype='text/csv; charset=utf-8', as_attachment=True, download_name='noc_plantilla.csv')
+
+# ---------------- Operadores (catálogo) ----------------
+@web_bp.route('/operadores')
+@roles_required('admin','user')
+def operadores_list():
+    ops = Operador.query.order_by(Operador.activo.desc(), Operador.nombre).all()
+    return render_template('operadores_list.html', operadores=ops)
+
+@web_bp.route('/operadores/csv')
+@roles_required('admin','user')
+def operadores_csv():
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['nombre','email','activo'])
+    for o in Operador.query.order_by(Operador.nombre):
+        writer.writerow([o.nombre, o.email, 'Sí' if o.activo else 'No'])
+    data = '\ufeff' + output.getvalue()
+    bio = BytesIO(data.encode('utf-8'))
+    bio.seek(0)
+    return send_file(bio, mimetype='text/csv; charset=utf-8', as_attachment=True, download_name='operadores.csv')
+
+@web_bp.route('/operadores/importar', methods=['GET','POST'])
+@roles_required('admin')
+def operadores_importar():
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if not file or not file.filename:
+            flash('Archivo no seleccionado','warning')
+            return redirect(request.url)
+        raw = file.read()
+        try:
+            text = raw.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            text = raw.decode('latin-1')
+        # Delimitador
+        try:
+            sample = "\n".join(text.splitlines()[:5])
+            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+            delimiter = dialect.delimiter or ','
+        except Exception:
+            delimiter = ';' if ';' in (text.splitlines()[0] if text.splitlines() else '') else ','
+        reader = csv.DictReader(StringIO(text), delimiter=delimiter)
+        # normalizar headers
+        def norm(s):
+            import re, unicodedata
+            s = s or ''
+            s = ''.join(c for c in unicodedata.normalize('NFKD', s) if not unicodedata.combining(c))
+            s = re.sub(r"\s+", "_", s.strip().lower())
+            s = re.sub(r"[^a-z0-9_]", "_", s)
+            return s.strip('_')
+        field_map = {}
+        for h in reader.fieldnames or []:
+            nh = norm(h)
+            if nh in ('nombre','name'):
+                field_map['nombre'] = h
+            elif nh in ('email','correo','mail'):
+                field_map['email'] = h
+            elif nh in ('activo','habilitado','enabled'):
+                field_map['activo'] = h
+        if 'nombre' not in field_map or 'email' not in field_map:
+            flash('Se requieren columnas: nombre, email','danger')
+            return redirect(request.url)
+        creados, actualizados = 0, 0
+        for row in reader:
+            nombre = (row.get(field_map['nombre']) or '').strip()
+            email = (row.get(field_map['email']) or '').strip()
+            if not email:
+                continue
+            activo = True
+            if 'activo' in field_map:
+                val = (row.get(field_map['activo']) or '').strip().lower()
+                activo = val in ('1','si','sí','true','activo','yes','y')
+            op = Operador.query.filter_by(email=email).first()
+            if op:
+                op.nombre = nombre or op.nombre
+                op.activo = activo
+                actualizados += 1
+            else:
+                db.session.add(Operador(nombre=nombre or email.split('@')[0], email=email, activo=activo))
+                creados += 1
+        db.session.commit()
+        flash(f'Importación de operadores: {creados} creados, {actualizados} actualizados','success')
+        return redirect(url_for('web.operadores_list'))
+    return render_template('operadores_importar.html')
+
+@web_bp.route('/operadores/nuevo', methods=['GET','POST'])
+@roles_required('admin')
+def operadores_nuevo():
+    from .forms import OperadorForm
+    form = OperadorForm()
+    if form.validate_on_submit():
+        op = Operador(nombre=form.nombre.data.strip(), email=form.email.data.strip(), activo=True if form.activo.data=='1' else False)
+        db.session.add(op)
+        db.session.commit()
+        flash('Operador creado','success')
+        return redirect(url_for('web.operadores_list'))
+    form.activo.data = '1'
+    return render_template('operador_form.html', form=form, modo='nuevo')
+
+@web_bp.route('/operadores/<int:op_id>/editar', methods=['GET','POST'])
+@roles_required('admin')
+def operadores_editar(op_id):
+    from .forms import OperadorForm
+    op = Operador.query.get_or_404(op_id)
+    form = OperadorForm(nombre=op.nombre, email=op.email, activo='1' if op.activo else '0')
+    if form.validate_on_submit():
+        op.nombre = form.nombre.data.strip()
+        op.email = form.email.data.strip()
+        op.activo = True if form.activo.data=='1' else False
+        db.session.commit()
+        flash('Operador actualizado','success')
+        return redirect(url_for('web.operadores_list'))
+    return render_template('operador_form.html', form=form, modo='editar', operador=op)
+
+@web_bp.route('/operadores/<int:op_id>/eliminar', methods=['POST'])
+@roles_required('admin')
+def operadores_eliminar(op_id):
+    op = Operador.query.get_or_404(op_id)
+    db.session.delete(op)
+    db.session.commit()
+    flash('Operador eliminado','success')
+    return redirect(url_for('web.operadores_list'))
+
+@web_bp.route('/noc/importar', methods=['GET','POST'])
+@roles_required('admin','user')
+def noc_importar():
+    """Importa incidentes NOC desde CSV (con vista previa).
+
+    Encabezados aceptados (insensibles a mayúsculas; se permiten acentos y variantes):
+    - fecha, sucursal, ticket, reporta, problema, proveedor, solucion, tiempo_solucion|tiempo de solucion, caida|caída
+    Fechas aceptadas: YYYY-MM-DD o DD/MM/YYYY.
+    Upsert por 'ticket' si viene; si no, crea siempre registro nuevo.
+    """
+    # Confirmación final (token sin archivo)
+    if request.method == 'POST' and 'token' in request.form and not request.files.get('file'):
+        token = request.form.get('token')
+        cache = current_app.config.setdefault('NOC_IMPORT_CACHE', {})
+        payload = cache.pop(token, None)
+        if not payload:
+            flash('Sesión de importación expirada. Vuelve a cargar el archivo.','warning')
+            return redirect(url_for('web.noc_importar'))
+        rows = payload.get('rows', [])
+        creados, actualizados = 0, 0
+        for r in rows:
+            ticket = (r.get('ticket') or '').strip()
+            if ticket:
+                inc = NOCIncident.query.filter_by(ticket=ticket).first()
+                if inc:
+                    inc.fecha = r.get('fecha') or inc.fecha
+                    inc.sucursal = r.get('sucursal') or inc.sucursal
+                    inc.reporta = r.get('reporta') or inc.reporta
+                    inc.problema = r.get('problema') or inc.problema
+                    inc.proveedor = r.get('proveedor') or inc.proveedor
+                    inc.solucion = r.get('solucion') or inc.solucion
+                    inc.tiempo_solucion = r.get('tiempo_solucion') or inc.tiempo_solucion
+                    inc.caida = r.get('caida') or inc.caida
+                    actualizados += 1
+                else:
+                    db.session.add(NOCIncident(**r))
+                    creados += 1
+            else:
+                db.session.add(NOCIncident(**r))
+                creados += 1
+        db.session.commit()
+        flash(f'Importación NOC confirmada: {creados} creados, {actualizados} actualizados','success')
+        return redirect(url_for('web.noc_list'))
+
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if not file or not file.filename:
+            flash('Archivo no seleccionado','warning')
+            return redirect(request.url)
+        raw = file.read()
+        # Intentar UTF-8 con BOM y luego latin-1
+        try:
+            text = raw.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            text = raw.decode('latin-1')
+        # Detectar delimitador automáticamente (Excel en es-MX suele usar ';')
+        import re, unicodedata
+        try:
+            sample = "\n".join(text.splitlines()[:5])
+            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+            delimiter = dialect.delimiter or ','
+        except Exception:
+            delimiter = ';' if ';' in text.splitlines()[0] else ','
+        reader = csv.reader(StringIO(text), delimiter=delimiter)
+        header = next(reader, [])
+        if not header:
+            flash('CSV vacío','warning')
+            return redirect(request.url)
+        # Normalizar encabezados: quitar BOM/acentos, pasar a minúsculas y colapsar cualquier whitespace/puntuación a '_'
+        def norm(s: str) -> str:
+            if not isinstance(s, str):
+                s = str(s)
+            s = s.lstrip('\ufeff')
+            s = ''.join(c for c in unicodedata.normalize('NFKD', s) if not unicodedata.combining(c))
+            s = s.strip()
+            s = re.sub(r"\s+", "_", s)
+            s = s.lower()
+            s = re.sub(r"[^a-z0-9_]+", "_", s)
+            s = s.strip('_')
+            return s
+        hmap = {norm(h): i for i, h in enumerate(header)}
+        # Posibles alias
+        def idx_of(*names):
+            for n in names:
+                if n in hmap:
+                    return hmap[n]
+            return None
+        idx = {
+            'fecha': idx_of('fecha','date','fecha_incidente'),
+            'sucursal': idx_of('sucursal','suc','tienda','local'),
+            'ticket': idx_of('ticket','numero_de_ticket','numero_ticket','nro_ticket'),
+            'reporta': idx_of('persona_que_reporta','reporta','persona_reporta'),
+            'problema': idx_of('problema_reportado','problema'),
+            'proveedor': idx_of('proveedor_reportado','proveedor'),
+            'solucion': idx_of('solucion'),
+            'tiempo_solucion': idx_of('tiempo_solucion','tiempo_de_solucion'),
+            'caida': idx_of('caida','caida_si_no','farmacia_caida_si_no','caida_si_no')
+        }
+        if not idx['fecha'] or not idx['sucursal']:
+            flash('Se requieren columnas al menos: fecha, sucursal','danger')
+            return redirect(request.url)
+        def parse_fecha(s):
+            s = (s or '').strip()
+            if not s:
+                return None
+            for fmt in ('%Y-%m-%d','%d/%m/%Y','%m/%d/%Y'):
+                try:
+                    return datetime.strptime(s, fmt).date()
+                except Exception:
+                    continue
+            return None
+        # Parsear a filas normalizadas
+        rows = []
+        for row in reader:
+            if not row:
+                continue
+            get = lambda key: (row[idx[key]].strip() if idx.get(key) is not None and len(row) > idx[key] and row[idx[key]] is not None else '')
+            r = {
+                'fecha': parse_fecha(get('fecha')),
+                'sucursal': get('sucursal') or None,
+                'ticket': get('ticket') or None,
+                'reporta': get('reporta') or None,
+                'problema': get('problema') or None,
+                'proveedor': get('proveedor') or None,
+                'solucion': get('solucion') or None,
+                'tiempo_solucion': get('tiempo_solucion') or None,
+                'caida': get('caida') or None,
+            }
+            # Al menos sucursal o ticket para considerar la fila
+            if any([r['fecha'], r['sucursal'], r['ticket'], r['problema'], r['solucion']]):
+                rows.append(r)
+        if not rows:
+            flash('No se encontraron filas válidas','warning')
+            return redirect(request.url)
+        # Guardar en caché para confirmación y mostrar vista previa
+        cache = current_app.config.setdefault('NOC_IMPORT_CACHE', {})
+        # Limpieza simple de entradas viejas (>30 min)
+        try:
+            now = datetime.utcnow()
+            for k, v in list(cache.items()):
+                if (now - v.get('ts', now)).total_seconds() > 1800:
+                    cache.pop(k, None)
+        except Exception:
+            pass
+        token = secrets.token_urlsafe(16)
+        cache[token] = {'rows': rows, 'ts': datetime.utcnow()}
+        # Estadísticas para preview
+        with_ticket = sum(1 for r in rows if r.get('ticket'))
+        preview = rows[:20]
+        return render_template('noc_importar_preview.html', token=token, total=len(rows), con_ticket=with_ticket, preview=preview)
+    return render_template('noc_importar.html')
 
 
 @api_bp.route('/inventario/<int:item_id>/cerrar', methods=['POST'])
