@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, IntegerField, TextAreaField, SelectField, DateField, SubmitField, PasswordField
+from wtforms import StringField, IntegerField, TextAreaField, SelectField, DateField, SubmitField, PasswordField, FileField
 from wtforms.validators import DataRequired, Optional, Length, EqualTo, ValidationError, NumberRange
 from .models import User
 from wtforms import FieldList, FormField, HiddenField
@@ -76,6 +76,7 @@ class OperationChecklistItemForm(FlaskForm):
     hora_objetivo = StringField('Hora')  # solo lectura
     estado = SelectField('Estado', choices=CHECKLIST_ESTADO_CHOICES)
     observacion = TextAreaField('Observación', validators=[Optional(), Length(max=500)])
+    image_file = FileField('Img')
     # hidden para mantener orden
     _idx = HiddenField()
 
@@ -93,4 +94,7 @@ class ChecklistActividadForm(FlaskForm):
     hora_objetivo = StringField('Hora Objetivo', validators=[Optional(), Length(max=40)])
     orden = IntegerField('Orden', validators=[Optional()])
     activo = SelectField('Activo', choices=[('1','Sí'),('0','No')])
+    imagen_file = FileField('Imagen (PNG/JPG)')
+    # Mostrar o editar nombre existente (solo lectura cuando ya hay imagen)
+    imagen_ref = StringField('Nombre Archivo', validators=[Optional(), Length(max=255)])
     submit = SubmitField('Guardar')

@@ -11,6 +11,37 @@ from datetime import datetime, timedelta
 import secrets
 import hashlib
 from functools import wraps
+from PIL import Image
+
+MAX_IMAGE_BYTES = 500 * 1024  # 500 KB
+ALLOWED_FORMATS = {'PNG','JPEG','JPG','GIF','WEBP'}
+
+def validate_image(file_storage):
+    """Valida tamaño y formato real de la imagen.
+
+    Retorna (ok, error_message, detected_format)
+    """
+    if not file_storage or not getattr(file_storage, 'filename', None):
+        return False, 'Archivo vacío', None
+    # Tamaño (si está disponible via stream)
+    file_storage.stream.seek(0, 2)
+    size = file_storage.stream.tell()
+    file_storage.stream.seek(0)
+    if size > MAX_IMAGE_BYTES:
+        return False, f'Tamaño excede 500KB ({size//1024}KB)', None
+    try:
+        img = Image.open(file_storage.stream)
+        fmt = (img.format or '').upper()
+        if fmt == 'JPG':
+            fmt = 'JPEG'
+        if fmt not in ALLOWED_FORMATS:
+            return False, f'Formato no permitido: {fmt}', fmt
+        # Rewind para permitir save()
+        file_storage.stream.seek(0)
+        return True, None, fmt
+    except Exception:
+        file_storage.stream.seek(0)
+        return False, 'Archivo no es una imagen válida', None
 
 web_bp = Blueprint('web', __name__)
 api_bp = Blueprint('api', __name__)
@@ -596,13 +627,23 @@ def _build_checklist_form(fecha=None):
             entry.form._idx.data = str(idx)
     if fecha:
         form.fecha.data = fecha
-    return form
+    # También devolver mapping servicio->imagen_ref para mostrar en template
+    imagenes = {}
+    try:
+        for a in actividades:
+            if a.imagen_ref:
+                imagenes[a.servicio] = a.imagen_ref
+    except Exception:
+        pass
+    return form, imagenes
 
 @web_bp.route('/checklists/nuevo', methods=['GET','POST'])
 @roles_required('admin','user')
 def checklist_nuevo():
     from datetime import date
-    form = _build_checklist_form(date.today())
+    from werkzeug.utils import secure_filename
+    import os
+    form, imagenes_map = _build_checklist_form(date.today())
     if form.validate_on_submit():
         chk = OperationChecklist(
             fecha=form.fecha.data or date.today(),
@@ -610,12 +651,25 @@ def checklist_nuevo():
             usuario_id=current_user.id,
         )
         for entry in form.items.entries:
+            # Procesar archivo si se subió para este servicio
+            upload = entry.form.image_file.data
+            img_filename = imagenes_map.get(entry.form.servicio.data)
+            if upload and getattr(upload, 'filename', None):
+                ok, err, fmt = validate_image(upload)
+                if not ok:
+                    flash(f"Imagen inválida para {entry.form.servicio.data}: {err}", 'danger')
+                else:
+                    fname = secure_filename(upload.filename)
+                    os.makedirs(os.path.join(current_app.static_folder, 'actividades'), exist_ok=True)
+                    img_filename = f"item_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}_{fname}"
+                    upload.save(os.path.join(current_app.static_folder, 'actividades', img_filename))
             item = OperationChecklistItem(
                 servicio=entry.form.servicio.data,
                 responsable=entry.form.responsable.data,
                 hora_objetivo=entry.form.hora_objetivo.data,
                 estado=entry.form.estado.data,
                 observacion=entry.form.observacion.data,
+                imagen_ref=img_filename
             )
             chk.items.append(item)
         db.session.add(chk)
@@ -623,7 +677,7 @@ def checklist_nuevo():
         flash('Checklist guardado','success')
         log_event('checklist_create', current_user.id, 'OperationChecklist', chk.id, ip=request.remote_addr)
         return redirect(url_for('web.checklist_historial'))
-    return render_template('checklist_form.html', form=form)
+    return render_template('checklist_form.html', form=form, imagenes_map=imagenes_map)
 
 @web_bp.route('/checklists/<int:chk_id>')
 @roles_required('admin','user')
@@ -652,11 +706,18 @@ def _build_checklist_edit_form(chk: OperationChecklist):
 @roles_required('admin','user')
 def checklist_editar(chk_id):
     from datetime import date
+    from werkzeug.utils import secure_filename
+    import os
     chk = OperationChecklist.query.get_or_404(chk_id)
     if chk.fecha != date.today():
         flash('Solo se pueden editar checklists del día actual','warning')
         return redirect(url_for('web.checklist_ver', chk_id=chk.id))
     form = _build_checklist_edit_form(chk)
+    # Mapping de imágenes (actividades + items ya guardados)
+    imagenes_map = {a.servicio: a.imagen_ref for a in ChecklistActividad.query.filter(ChecklistActividad.imagen_ref != None).all() if a.imagen_ref}
+    for it in chk.items:
+        if it.imagen_ref and it.servicio not in imagenes_map:
+            imagenes_map[it.servicio] = it.imagen_ref
     if form.validate_on_submit():
         # Actualización parcial: iterar por índice mientras existan model items
         form.comentarios.data and setattr(chk, 'comentarios', form.comentarios.data)
@@ -669,11 +730,22 @@ def checklist_editar(chk_id):
                 model_item.estado = entry.form.estado.data
             # Observación puede estar vacía; se guarda tal cual (None si cadena vacía)
             model_item.observacion = entry.form.observacion.data
+            upload = entry.form.image_file.data
+            if upload and getattr(upload, 'filename', None):
+                ok, err, fmt = validate_image(upload)
+                if not ok:
+                    flash(f"Imagen inválida para {entry.form.servicio.data}: {err}", 'danger')
+                else:
+                    fname = secure_filename(upload.filename)
+                    os.makedirs(os.path.join(current_app.static_folder, 'actividades'), exist_ok=True)
+                    img_filename = f"item_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}_{fname}"
+                    upload.save(os.path.join(current_app.static_folder, 'actividades', img_filename))
+                    model_item.imagen_ref = img_filename
         db.session.commit()
         flash('Checklist actualizado','success')
         log_event('checklist_update', current_user.id, 'OperationChecklist', chk.id, ip=request.remote_addr)
         return redirect(url_for('web.checklist_ver', chk_id=chk.id))
-    return render_template('checklist_form.html', form=form, modo='editar')
+    return render_template('checklist_form.html', form=form, modo='editar', imagenes_map=imagenes_map)
 
 # ---- Administración de actividades del checklist ----
 @web_bp.route('/checklists/actividades')
@@ -686,14 +758,28 @@ def checklist_actividades_list():
 @roles_required('admin','user')
 def checklist_actividad_nueva():
     from .forms import ChecklistActividadForm
+    from werkzeug.utils import secure_filename
+    import os
     form = ChecklistActividadForm()
     if form.validate_on_submit():
+        filename = None
+        file = request.files.get('imagen_file')
+        if file and file.filename:
+            ok, err, fmt = validate_image(file)
+            if not ok:
+                flash(err,'danger')
+                return render_template('checklist_actividad_form.html', form=form, modo='nueva')
+            fname = secure_filename(file.filename)
+            os.makedirs(os.path.join(current_app.static_folder, 'actividades'), exist_ok=True)
+            filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{fname}"
+            file.save(os.path.join(current_app.static_folder, 'actividades', filename))
         act = ChecklistActividad(
             servicio=form.servicio.data.strip(),
             responsable=form.responsable.data.strip() if form.responsable.data else None,
             hora_objetivo=form.hora_objetivo.data.strip() if form.hora_objetivo.data else None,
             orden=form.orden.data or 0,
-            activo=True if form.activo.data=='1' else False
+            activo=True if form.activo.data=='1' else False,
+            imagen_ref=filename
         )
         db.session.add(act)
         db.session.commit()
@@ -705,14 +791,28 @@ def checklist_actividad_nueva():
 @roles_required('admin','user')
 def checklist_actividad_editar(act_id):
     from .forms import ChecklistActividadForm
+    from werkzeug.utils import secure_filename
+    import os
     act = ChecklistActividad.query.get_or_404(act_id)
     form = ChecklistActividadForm(servicio=act.servicio, responsable=act.responsable, hora_objetivo=act.hora_objetivo, orden=act.orden, activo='1' if act.activo else '0')
+    form.imagen_ref.data = act.imagen_ref
     if form.validate_on_submit():
         act.servicio = form.servicio.data.strip()
         act.responsable = form.responsable.data.strip() if form.responsable.data else None
         act.hora_objetivo = form.hora_objetivo.data.strip() if form.hora_objetivo.data else None
         act.orden = form.orden.data or 0
         act.activo = True if form.activo.data=='1' else False
+        file = request.files.get('imagen_file')
+        if file and file.filename:
+            ok, err, fmt = validate_image(file)
+            if not ok:
+                flash(err,'danger')
+                return render_template('checklist_actividad_form.html', form=form, modo='editar', actividad=act)
+            fname = secure_filename(file.filename)
+            os.makedirs(os.path.join(current_app.static_folder, 'actividades'), exist_ok=True)
+            filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{fname}"
+            file.save(os.path.join(current_app.static_folder, 'actividades', filename))
+            act.imagen_ref = filename
         db.session.commit()
         flash('Actividad actualizada','success')
         return redirect(url_for('web.checklist_actividades_list'))
@@ -733,14 +833,15 @@ def checklist_actividades_csv():
     """Exporta el catálogo actual de actividades a CSV."""
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(['servicio','responsable','hora_objetivo','orden','activo'])
+    writer.writerow(['servicio','responsable','hora_objetivo','orden','activo','imagen_ref'])
     for a in ChecklistActividad.query.order_by(ChecklistActividad.orden, ChecklistActividad.id).all():
         writer.writerow([
             a.servicio,
             a.responsable or '',
             a.hora_objetivo or '',
             a.orden or 0,
-            '1' if a.activo else '0'
+            '1' if a.activo else '0',
+            a.imagen_ref or ''
         ])
     data = '\ufeff' + output.getvalue()
     bio = BytesIO(data.encode('utf-8'))
@@ -753,7 +854,7 @@ def checklist_actividades_importar():
     """Importación masiva de actividades desde un CSV.
 
     Columnas esperadas (en cualquier orden, encabezado obligatorio):
-    servicio,responsable,hora_objetivo,orden,activo
+    servicio,responsable,hora_objetivo,orden,activo,imagen_ref
     - activo admite: 1/0, si/no, true/false (case-insensitive)
     - orden se convierte a entero (default 0)
     """
@@ -774,11 +875,15 @@ def checklist_actividades_importar():
         reader = csv.reader(content.splitlines())
         header = next(reader, [])
         header_norm = [h.strip().lower() for h in header]
+        if not header_norm:
+            flash('CSV vacío','warning')
+            return redirect(request.url)
         required = ['servicio']
         if not all(r in header_norm for r in required):
             flash('Encabezado debe incluir al menos la columna servicio','danger')
             return redirect(request.url)
-        idx = {name: header_norm.index(name) for name in header_norm}
+        # Mapear nombre->índice sólo una vez (evitar repetir index())
+        idx = {name: i for i, name in enumerate(header_norm)}
         creados = 0
         actualizados = 0
         for row in reader:
@@ -795,23 +900,23 @@ def checklist_actividades_importar():
             orden_val = 0
             if 'orden' in idx and len(row) > idx['orden']:
                 try:
-                    orden_val = int(row[idx['orden']].strip() or '0')
-                except ValueError:
+                    orden_val = int((row[idx['orden']] or '0').strip() or '0')
+                except Exception:
                     orden_val = 0
             activo_val = True
             if 'activo' in idx and len(row) > idx['activo']:
-                raw_act = row[idx['activo']].strip().lower()
+                raw_act = (row[idx['activo']] or '').strip().lower()
                 if raw_act in ('0','no','false','f','n'):
                     activo_val = False
-                else:
-                    activo_val = True
-            # Si ya existe un registro exacto para el servicio, actualizar campos
+            imagen_ref = row[idx['imagen_ref']].strip() if 'imagen_ref' in idx and len(row) > idx['imagen_ref'] and row[idx['imagen_ref']] else None
             existente = ChecklistActividad.query.filter_by(servicio=servicio).first()
             if existente:
                 existente.responsable = responsable or None
                 existente.hora_objetivo = hora or None
                 existente.orden = orden_val
                 existente.activo = activo_val
+                if imagen_ref:
+                    existente.imagen_ref = imagen_ref
                 actualizados += 1
             else:
                 db.session.add(ChecklistActividad(
@@ -819,7 +924,8 @@ def checklist_actividades_importar():
                     responsable=responsable or None,
                     hora_objetivo=hora or None,
                     orden=orden_val,
-                    activo=activo_val
+                    activo=activo_val,
+                    imagen_ref=imagen_ref or None
                 ))
                 creados += 1
         db.session.commit()
@@ -843,14 +949,14 @@ def checklist_eliminar(chk_id):
 @web_bp.route('/checklists/csv')
 @roles_required('admin')
 def checklist_csv():
-    # Export simple: fecha, usuario, servicio, responsable, hora_objetivo, estado, observacion
+    # Export incluye imagen_ref: fecha, usuario, servicio, responsable, hora_objetivo, estado, observacion, imagen_ref
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(['fecha','usuario','servicio','responsable','hora_objetivo','estado','observacion'])
+    writer.writerow(['fecha','usuario','servicio','responsable','hora_objetivo','estado','observacion','imagen_ref'])
     for chk in OperationChecklist.query.order_by(OperationChecklist.fecha.desc(), OperationChecklist.id.desc()).limit(1000):
         user = chk.usuario.username if getattr(chk, 'usuario', None) else ''
         for item in chk.items:
-            writer.writerow([chk.fecha, user, item.servicio, item.responsable, item.hora_objetivo, item.estado, (item.observacion or '').replace('\n',' ')])
+            writer.writerow([chk.fecha, user, item.servicio, item.responsable, item.hora_objetivo, item.estado, (item.observacion or '').replace('\n',' '), item.imagen_ref or ''])
     data = '\ufeff' + output.getvalue()
     bio = BytesIO(data.encode('utf-8'))
     bio.seek(0)

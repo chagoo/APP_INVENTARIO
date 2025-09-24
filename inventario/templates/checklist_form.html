@@ -2,7 +2,7 @@
 {% block title %}{{ 'Editar' if modo=='editar' else 'Nuevo' }} Checklist | {{ super() }}{% endblock %}
 {% block content %}
 <h3>Checklist Operación Diaria - {{ 'Editar' if modo=='editar' else 'Nuevo' }}</h3>
-<form method="post" novalidate>
+<form method="post" novalidate enctype="multipart/form-data">
   {{ form.hidden_tag() }}
   <div class="row mb-3">
     <div class="col-md-3">{{ form.fecha.label(class='form-label') }} {{ form.fecha(class='form-control') }}</div>
@@ -12,9 +12,10 @@
     <table class="table table-sm table-bordered align-middle">
       <thead class="table-light">
         <tr>
-          <th style="width:30%">Servicio</th>
-          <th style="width:15%">Responsable</th>
+          <th style="width:28%">Servicio</th>
+          <th style="width:14%">Responsable</th>
           <th style="width:10%">Hora</th>
+          <th style="width:10%">Imagen</th>
           <th style="width:15%">Estado</th>
           <th>Observación</th>
         </tr>
@@ -34,6 +35,15 @@
           <td class="cell-static">
             <input type="hidden" name="{{ sub.form.hora_objetivo.name }}" value="{{ sub.form.hora_objetivo.data }}">
             <span>{{ sub.form.hora_objetivo.data }}</span>
+          </td>
+          <td class="text-center" style="white-space:nowrap">
+            {% set img = (imagenes_map or {}).get(sub.form.servicio.data) %}
+            {% if img %}
+              <a href="{{ url_for('static', filename='actividades/' ~ img) }}" target="_blank" class="d-inline-block me-1" title="Ver imagen completa">
+                <img src="{{ url_for('static', filename='actividades/' ~ img) }}" alt="img {{ sub.form.servicio.data }}" class="thumb-img" loading="lazy">
+              </a>
+            {% endif %}
+            {{ sub.form.image_file(class='form-control form-control-sm', accept='.png,.jpg,.jpeg,.gif,.webp') }}
           </td>
           <td>{{ sub.form.estado(class='form-select form-select-sm') }}</td>
           <td>{{ sub.form.observacion(class='form-control form-control-sm', rows=1, placeholder='Observación...') }}</td>

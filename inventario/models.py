@@ -156,6 +156,7 @@ class OperationChecklistItem(db.Model):
     hora_objetivo = db.Column(db.String(40))  # texto libre "6am", "7am y 9am" etc
     estado = db.Column(db.String(20), default='Pendiente')  # Pendiente / OK / Alerta
     observacion = db.Column(db.Text)
+    imagen_ref = db.Column(db.String(255))
 
     def to_dict(self):
         return {
@@ -164,6 +165,7 @@ class OperationChecklistItem(db.Model):
             'hora_objetivo': self.hora_objetivo,
             'estado': self.estado,
             'observacion': self.observacion,
+            'imagen_ref': self.imagen_ref,
         }
 
 
@@ -177,6 +179,8 @@ class ChecklistActividad(db.Model):
     orden = db.Column(db.Integer, default=0, index=True)
     activo = db.Column(db.Boolean, default=True, index=True)
     creado_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Ruta/filename relativo dentro de static/actividades (ej: 'cpu_ok.png')
+    imagen_ref = db.Column(db.String(255))
 
     def to_dict(self):
         return {
@@ -186,4 +190,5 @@ class ChecklistActividad(db.Model):
             'hora_objetivo': self.hora_objetivo,
             'orden': self.orden,
             'activo': self.activo,
+            'imagen_ref': self.imagen_ref,
         }

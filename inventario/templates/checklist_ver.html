@@ -11,13 +11,18 @@
 {% if chk.comentarios %}<div class="alert alert-info py-2"><strong>Comentarios:</strong> {{ chk.comentarios }}</div>{% endif %}
 <div class="table-responsive">
   <table class="table table-bordered table-sm align-middle">
-    <thead class="table-light"><tr><th>Servicio</th><th>Responsable</th><th>Hora</th><th>Estado</th><th>Observación</th></tr></thead>
+    <thead class="table-light"><tr><th>Servicio</th><th>Responsable</th><th>Hora</th><th>Imagen</th><th>Estado</th><th>Observación</th></tr></thead>
     <tbody>
     {% for it in chk.items %}
       <tr class="{% if it.estado=='Alerta' %}table-danger{% elif it.estado=='OK' %}table-success{% endif %}">
         <td>{{ it.servicio }}</td>
         <td>{{ it.responsable }}</td>
         <td>{{ it.hora_objetivo }}</td>
+        <td class="text-center">{% if it.imagen_ref %}
+          <a href="{{ url_for('static', filename='actividades/' ~ it.imagen_ref) }}" target="_blank" title="Ver imagen completa">
+            <img src="{{ url_for('static', filename='actividades/' ~ it.imagen_ref) }}" alt="img {{ it.servicio }}" class="thumb-img" loading="lazy">
+          </a>
+        {% else %}-{% endif %}</td>
         <td>{{ it.estado }}</td>
         <td style="white-space:pre-wrap">{{ it.observacion }}</td>
       </tr>

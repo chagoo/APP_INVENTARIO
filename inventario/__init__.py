@@ -130,6 +130,46 @@ def register_cli(app):
         db.session.commit()
         print('Usuario creado')
 
+    @app.cli.command('orphan-images')
+    def orphan_images_command():
+        """Lista (y opcionalmente elimina) imágenes huérfanas en static/actividades.
+
+        Uso:
+          flask orphan-images            -> solo listar
+          FLASK_ORPHAN_DELETE=1 flask orphan-images  -> eliminar huérfanas
+        """
+        import os
+        from .models import OperationChecklistItem, ChecklistActividad
+        base_dir = os.path.join(app.static_folder, 'actividades')
+        if not os.path.isdir(base_dir):
+            print('No existe carpeta de actividades.')
+            return
+        referenced = set()
+        for r in ChecklistActividad.query.with_entities(ChecklistActividad.imagen_ref).all():
+            if r[0]:
+                referenced.add(r[0])
+        for r in OperationChecklistItem.query.with_entities(OperationChecklistItem.imagen_ref).all():
+            if r[0]:
+                referenced.add(r[0])
+        all_files = {f for f in os.listdir(base_dir) if os.path.isfile(os.path.join(base_dir, f))}
+        orphans = sorted(all_files - referenced)
+        if not orphans:
+            print('Sin huérfanas. Total archivos:', len(all_files))
+            return
+        delete = os.environ.get('FLASK_ORPHAN_DELETE') == '1'
+        print(f"Encontradas {len(orphans)} imágenes huérfanas de {len(all_files)} archivos totales:")
+        for f in orphans:
+            print(' -', f)
+            if delete:
+                try:
+                    os.remove(os.path.join(base_dir, f))
+                except Exception as e:
+                    print('   error eliminando', f, e)
+        if delete:
+            print('Eliminación completada.')
+        else:
+            print('Para eliminar establecer FLASK_ORPHAN_DELETE=1')
+
 def _ensure_user_new_columns():
     """Light auto-migration for newly added User columns (SQLite only)."""
     from sqlalchemy import text

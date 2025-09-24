@@ -11,7 +11,7 @@
 </div>
 <div class="table-responsive">
 <table class="table table-sm table-striped align-middle">
-  <thead class="table-light"><tr><th>ID</th><th>Servicio</th><th>Responsable</th><th>Hora</th><th>Orden</th><th>Activo</th><th>Acciones</th></tr></thead>
+  <thead class="table-light"><tr><th>ID</th><th>Servicio</th><th>Responsable</th><th>Hora</th><th>Orden</th><th>Activo</th><th>Imagen</th><th>Acciones</th></tr></thead>
   <tbody>
   {% for a in actividades %}
     <tr class="{% if not a.activo %}table-secondary{% endif %}">
@@ -21,6 +21,13 @@
       <td>{{ a.hora_objetivo }}</td>
       <td>{{ a.orden }}</td>
       <td>{{ 'Sí' if a.activo else 'No' }}</td>
+      <td class="text-center">
+        {% if a.imagen_ref %}
+          <a href="{{ url_for('static', filename='actividades/' ~ a.imagen_ref) }}" target="_blank" title="Ver imagen completa">
+            <img src="{{ url_for('static', filename='actividades/' ~ a.imagen_ref) }}" alt="img {{ a.servicio }}" class="thumb-img" loading="lazy">
+          </a>
+        {% else %}-{% endif %}
+      </td>
       <td class="text-nowrap">
         <a class="btn btn-sm btn-outline-primary" href="{{ url_for('web.checklist_actividad_editar', act_id=a.id) }}">Editar</a>
         {% if current_user.role == 'admin' %}
