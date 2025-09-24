@@ -691,15 +691,35 @@ def _build_checklist_edit_form(chk: OperationChecklist):
     form.fecha.data = chk.fecha
     form.comentarios.data = chk.comentarios
     items_sorted = sorted(chk.items, key=lambda x: x.id)
+    existing_services = set()
     for idx, it in enumerate(items_sorted):
         form.items.append_entry({})
         entry = form.items.entries[-1]
         entry.form.servicio.data = it.servicio
+        existing_services.add(it.servicio.strip().lower())
         entry.form.responsable.data = it.responsable
         entry.form.hora_objetivo.data = it.hora_objetivo
         entry.form.estado.data = it.estado
         entry.form.observacion.data = it.observacion
         entry.form._idx.data = str(idx)
+    # Detectar actividades nuevas activas que no están en el checklist
+    nuevas = ChecklistActividad.query.filter_by(activo=True).order_by(ChecklistActividad.orden, ChecklistActividad.id).all()
+    added = 0
+    base_idx = len(form.items.entries)
+    for offset, act in enumerate(nuevas):
+        key = act.servicio.strip().lower()
+        if key in existing_services:
+            continue
+        form.items.append_entry({})
+        entry = form.items.entries[-1]
+        entry.form.servicio.data = act.servicio
+        entry.form.responsable.data = act.responsable
+        entry.form.hora_objetivo.data = act.hora_objetivo
+        entry.form.estado.data = 'Pendiente'
+        entry.form.observacion.data = ''
+        entry.form._idx.data = str(base_idx + added)
+        added += 1
+        existing_services.add(key)
     return form
 
 @web_bp.route('/checklists/<int:chk_id>/editar', methods=['GET','POST'])
@@ -722,13 +742,15 @@ def checklist_editar(chk_id):
         # Actualización parcial: iterar por índice mientras existan model items
         form.comentarios.data and setattr(chk, 'comentarios', form.comentarios.data)
         items_sorted = sorted(chk.items, key=lambda x: x.id)
-        total = min(len(items_sorted), len(form.items.entries))
-        for i in range(total):
+        total_existing = len(items_sorted)
+        # Primero actualizar los existentes
+        for i in range(min(total_existing, len(form.items.entries))):
             entry = form.items.entries[i]
+            if i >= total_existing:
+                break
             model_item = items_sorted[i]
             if entry.form.estado.data:
                 model_item.estado = entry.form.estado.data
-            # Observación puede estar vacía; se guarda tal cual (None si cadena vacía)
             model_item.observacion = entry.form.observacion.data
             upload = entry.form.image_file.data
             if upload and getattr(upload, 'filename', None):
@@ -741,8 +763,56 @@ def checklist_editar(chk_id):
                     img_filename = f"item_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}_{fname}"
                     upload.save(os.path.join(current_app.static_folder, 'actividades', img_filename))
                     model_item.imagen_ref = img_filename
+        # Luego crear nuevos items (los que exceden total_existing)
+        nuevos_creados = 0
+        normalized_existing = {it.servicio.strip().lower(): it for it in items_sorted}
+        for j in range(total_existing, len(form.items.entries)):
+            entry = form.items.entries[j]
+            # Evitar crear si por alguna razón servicio vacío
+            servicio = entry.form.servicio.data
+            if not servicio:
+                continue
+            key = servicio.strip().lower()
+            if key in normalized_existing:  # ya existe, no crear duplicado
+                continue
+            item = OperationChecklistItem(
+                servicio=servicio,
+                responsable=entry.form.responsable.data,
+                hora_objetivo=entry.form.hora_objetivo.data,
+                estado=entry.form.estado.data or 'Pendiente',
+                observacion=entry.form.observacion.data,
+            )
+            upload = entry.form.image_file.data
+            if upload and getattr(upload, 'filename', None):
+                ok, err, fmt = validate_image(upload)
+                if ok:
+                    fname = secure_filename(upload.filename)
+                    os.makedirs(os.path.join(current_app.static_folder, 'actividades'), exist_ok=True)
+                    img_filename = f"item_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}_{fname}"
+                    upload.save(os.path.join(current_app.static_folder, 'actividades', img_filename))
+                    item.imagen_ref = img_filename
+                else:
+                    flash(f"Imagen inválida para {servicio}: {err}", 'danger')
+            chk.items.append(item)
+            nuevos_creados += 1
+        # Deduplicar por servicio (caso de estados previos) conservando el primer item
+        seen = set()
+        to_delete = []
+        for it in chk.items:
+            k = (it.servicio or '').strip().lower()
+            if k in seen:
+                to_delete.append(it)
+            else:
+                seen.add(k)
+        for it in to_delete:
+            db.session.delete(it)
         db.session.commit()
-        flash('Checklist actualizado','success')
+        msg = 'Checklist actualizado'
+        if nuevos_creados:
+            msg += f' (+{nuevos_creados} actividades nuevas)'
+        if to_delete:
+            msg += f' (deduplicadas {len(to_delete)})'
+        flash(msg,'success')
         log_event('checklist_update', current_user.id, 'OperationChecklist', chk.id, ip=request.remote_addr)
         return redirect(url_for('web.checklist_ver', chk_id=chk.id))
     return render_template('checklist_form.html', form=form, modo='editar', imagenes_map=imagenes_map)

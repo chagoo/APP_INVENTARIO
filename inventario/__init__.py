@@ -82,6 +82,34 @@ def create_app(test_config=None):
         from .routes import web_bp, api_bp
         app.register_blueprint(web_bp)
         app.register_blueprint(api_bp, url_prefix="/api")
+        # Filtro Jinja para mostrar fechas en zona horaria México (Central) manteniendo formato consistente
+        try:
+            from zoneinfo import ZoneInfo  # Python 3.9+
+            tz_mx = ZoneInfo('America/Mexico_City')
+        except Exception:
+            tz_mx = None
+
+        def dt_mx(value, fmt='%Y-%m-%d %H:%M'):
+            """Renderiza un datetime (asumido UTC) en America/Mexico_City.
+
+            Si no hay zoneinfo disponible o value es falsy, retorna cadena vacía o str(value).
+            """
+            if not value:
+                return ''
+            try:
+                # Si no tiene tzinfo asumimos UTC
+                if getattr(value, 'tzinfo', None) is None:
+                    from datetime import timezone
+                    value = value.replace(tzinfo=timezone.utc)
+                if tz_mx:
+                    value = value.astimezone(tz_mx)
+                return value.strftime(fmt)
+            except Exception:
+                try:
+                    return str(value)
+                except Exception:
+                    return ''
+        app.jinja_env.filters['dt_mx'] = dt_mx
         # Seed default admin si no hay usuarios
         from .models import User
         if User.query.count() == 0 and not app.config.get('TESTING'):

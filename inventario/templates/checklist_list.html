@@ -24,18 +24,20 @@
 <div class="table-responsive">
   <table class="table table-striped table-sm align-middle">
     <thead class="table-light">
-      <tr><th>Fecha</th><th>Creado</th><th></th>Usuario</th><th>Items OK</th><th>Items Alerta</th><th>Acciones</th></tr>
+      <tr><th>Fecha</th><th>Creado (MX)</th><th>Usuario</th><th>Items OK</th><th>Items Alerta</th><th>Items Pend</th><th>Acciones</th></tr>
     </thead>
     <tbody>
     {% for r in registros %}
       {% set ok = r.items|selectattr('estado','equalto','OK')|list|length %}
       {% set alerta = r.items|selectattr('estado','equalto','Alerta')|list|length %}
+      {% set pend = r.items|selectattr('estado','equalto','Pendiente')|list|length %}
       <tr>
         <td>{{ r.fecha }}</td>
-        <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '' }}</td>
+        <td>{{ r.created_at|dt_mx('%Y-%m-%d %H:%M') }}</td>
         <td>{{ r.usuario.username if r.usuario else '-' }}</td>
         <td>{{ ok }}</td>
         <td class="{{ 'text-danger fw-bold' if alerta>0 else '' }}">{{ alerta }}</td>
+        <td class="{{ 'text-warning fw-bold' if pend>0 else '' }}">{{ pend }}</td>
         <td class="text-nowrap">
           <a href="{{ url_for('web.checklist_ver', chk_id=r.id) }}" class="btn btn-sm btn-outline-primary">Ver</a>
           {% if current_user.role == 'admin' %}
