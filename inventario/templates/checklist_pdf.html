@@ -3,6 +3,11 @@
 <head>
   <meta charset="utf-8">
   <style>
+    /* Página en horizontal para que quepan mejor los comentarios */
+    @page {
+      size: A4 landscape; /* también admite: letter landscape */
+      margin: 10mm;
+    }
     body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; }
     h2 { margin: 0 0 8px 0; }
     table { width: 100%; border-collapse: collapse; }
@@ -13,6 +18,8 @@
     .pendiente { background: #fff3cd; }
     .small { color: #666; font-size: 11px; }
     img.thumb { max-height: 48px; }
+    /* Evitar que correos u observaciones se salgan de la celda */
+    td, th { word-break: break-word; }
   </style>
 </head>
 <body>

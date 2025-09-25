@@ -98,3 +98,37 @@ _csv.Error: new-line character seen in unquoted field - do you need to open the 
 2025-09-25 08:58:57,611 WARNING waitress.queue: Task queue depth is 2
 2025-09-25 08:59:29,887 WARNING waitress.queue: Task queue depth is 1
 2025-09-25 08:59:29,890 WARNING waitress.queue: Task queue depth is 2
+2025-09-25 09:10:23,272 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-25 09:10:23,404 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-25 09:10:48,876 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 09:10:48,876 WARNING waitress.queue: Task queue depth is 2
+2025-09-25 09:10:50,531 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 09:10:50,539 WARNING waitress.queue: Task queue depth is 2
+2025-09-25 09:31:41,065 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-25 09:31:41,091 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-25 09:32:04,436 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 09:32:04,438 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 09:32:06,635 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 09:32:06,642 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 09:38:40,722 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 09:41:55,325 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 09:48:49,649 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 09:56:50,466 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 09:56:50,471 WARNING waitress.queue: Task queue depth is 2
+2025-09-25 09:57:06,454 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 10:49:40,494 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-25 10:49:40,527 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-25 11:18:46,699 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-25 11:18:46,743 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-25 11:19:08,786 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 11:19:08,787 WARNING waitress.queue: Task queue depth is 2
+2025-09-25 11:24:07,909 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-25 11:24:07,944 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-25 11:25:13,986 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 11:25:13,990 WARNING waitress.queue: Task queue depth is 2
+2025-09-25 11:25:13,998 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 11:29:21,483 INFO root: Arrancando waitress (quiet) puerto=8001 threads=4
+2025-09-25 11:29:21,524 INFO waitress: Serving on http://0.0.0.0:8001
+2025-09-25 11:29:42,139 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 11:29:42,143 WARNING waitress.queue: Task queue depth is 1
+2025-09-25 11:29:42,147 WARNING waitress.queue: Task queue depth is 2
