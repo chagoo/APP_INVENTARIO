@@ -710,6 +710,39 @@ def checklist_ver(chk_id):
     from datetime import date
     return render_template('checklist_ver.html', chk=chk, hoy=date.today())
 
+def _pdf_link_callback(uri, rel):
+    """Resolver rutas /static para xhtml2pdf en el filesystem."""
+    # Si ya es un path absoluto, regresarlo
+    if os.path.isabs(uri) and os.path.exists(uri):
+        return uri
+    # Rutas /static/... o con static_url_path
+    static_url = current_app.static_url_path
+    if uri.startswith(static_url):
+        path_rel = uri[len(static_url):].lstrip('/')
+        return os.path.join(current_app.static_folder, path_rel)
+    if uri.startswith('/static/'):
+        return os.path.join(current_app.static_folder, uri.split('/static/',1)[1])
+    # URLs absolutas externas no son soportadas por defecto
+    return uri
+
+@web_bp.route('/checklists/<int:chk_id>/pdf')
+@roles_required('admin','user')
+def checklist_pdf(chk_id):
+    """Exporta el checklist a PDF (formato sencillo imprimible)."""
+    try:
+        import importlib
+        pisa = importlib.import_module('xhtml2pdf.pisa')
+    except Exception:
+        flash('No se pudo generar PDF: falta el paquete xhtml2pdf. Pide al admin instalarlo.', 'danger')
+        return redirect(url_for('web.checklist_ver', chk_id=chk_id))
+    chk = OperationChecklist.query.get_or_404(chk_id)
+    html = render_template('checklist_pdf.html', chk=chk)
+    pdf_io = BytesIO()
+    pisa.CreatePDF(src=html, dest=pdf_io, link_callback=_pdf_link_callback, encoding='utf-8')
+    pdf_io.seek(0)
+    filename = f"checklist_{chk.fecha}.pdf"
+    return send_file(pdf_io, mimetype='application/pdf', as_attachment=True, download_name=filename)
+
 def _build_checklist_edit_form(chk: OperationChecklist):
     form = OperationChecklistForm()
     try:

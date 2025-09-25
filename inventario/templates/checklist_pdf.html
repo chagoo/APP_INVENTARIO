@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; }
+    h2 { margin: 0 0 8px 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #999; padding: 4px 6px; vertical-align: top; }
+    th { background: #efefef; }
+    .ok { background: #d1e7dd; }
+    .alerta { background: #f8d7da; }
+    .pendiente { background: #fff3cd; }
+    .small { color: #666; font-size: 11px; }
+    img.thumb { max-height: 48px; }
+  </style>
+</head>
+<body>
+  <h2>Checklist Operación — {{ chk.fecha }}</h2>
+  <p class="small">Generado: {{ (chk.created_at or '') }} | Usuario: {{ chk.usuario.username if chk.usuario else '' }}</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Servicio</th><th>Responsable</th><th>Hora</th><th>Imagen</th><th>Estado</th><th>Operador</th><th>Observación</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in chk.items %}
+      <tr class="{{ 'ok' if it.estado=='OK' else ('alerta' if it.estado=='Alerta' else 'pendiente') }}">
+        <td>{{ it.servicio }}</td>
+        <td>{{ it.responsable }}</td>
+        <td>{{ it.hora_objetivo }}</td>
+        <td>
+          {% if it.imagen_ref %}
+            <img class="thumb" src="{{ url_for('static', filename='actividades/' ~ it.imagen_ref) }}" alt="img">
+          {% else %}-{% endif %}
+        </td>
+        <td>{{ it.estado }}</td>
+        <td>{{ it.operador or '-' }}</td>
+        <td>{{ it.observacion or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

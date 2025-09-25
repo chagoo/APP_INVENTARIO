@@ -6,6 +6,12 @@
 {% if chk.fecha == hoy %}
 <div class="mb-2">
   <a href="{{ url_for('web.checklist_editar', chk_id=chk.id) }}" class="btn btn-sm btn-primary">Editar (hoy)</a>
+  <a href="{{ url_for('web.checklist_pdf', chk_id=chk.id) }}" class="btn btn-sm btn-outline-secondary">Exportar PDF</a>
+</div>
+{% endif %}
+{% if chk.fecha != hoy %}
+<div class="mb-2">
+  <a href="{{ url_for('web.checklist_pdf', chk_id=chk.id) }}" class="btn btn-sm btn-outline-secondary">Exportar PDF</a>
 </div>
 {% endif %}
 {% if chk.comentarios %}<div class="alert alert-info py-2"><strong>Comentarios:</strong> {{ chk.comentarios }}</div>{% endif %}

@@ -8,4 +8,5 @@ pytest==7.4.2
 waitress==3.0.0
 pyodbc==5.1.0  # Para conexión a SQL Server mediante mssql+pyodbc
 python-dotenv==1.0.1  # Carga de variables desde archivo .env
+xhtml2pdf==0.2.15
 Pillow==10.4.0  # Procesamiento / validación de imágenes
