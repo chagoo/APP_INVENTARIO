@@ -667,9 +667,20 @@ def checklist_nuevo():
     from werkzeug.utils import secure_filename
     import os
     form, imagenes_map = _build_checklist_form(date.today())
+    # Determinar fecha seleccionada (hoy por defecto) y si ya existe un checklist
+    try:
+        selected_date = form.fecha.data or date.today()
+    except Exception:
+        selected_date = date.today()
+    existente = OperationChecklist.query.filter(OperationChecklist.fecha == selected_date).order_by(OperationChecklist.id.desc()).first()
+
     if form.validate_on_submit():
+        # Si ya existe y el usuario no confirmó, mostrar advertencia y no crear
+        if existente and (request.form.get('force') != '1'):
+            flash(f"Ya existe un checklist para {selected_date}. Puedes ver el existente o confirmar para crear otro.", 'warning')
+            return render_template('checklist_form.html', form=form, imagenes_map=imagenes_map, duplicado_info=existente)
         chk = OperationChecklist(
-            fecha=form.fecha.data or date.today(),
+            fecha=selected_date,
             comentarios=form.comentarios.data,
             usuario_id=current_user.id,
         )
@@ -701,7 +712,8 @@ def checklist_nuevo():
         flash('Checklist guardado','success')
         log_event('checklist_create', current_user.id, 'OperationChecklist', chk.id, ip=request.remote_addr)
         return redirect(url_for('web.checklist_historial'))
-    return render_template('checklist_form.html', form=form, imagenes_map=imagenes_map)
+    # En GET, si ya existe hoy, mostrar aviso informativo para evitar duplicados accidentales
+    return render_template('checklist_form.html', form=form, imagenes_map=imagenes_map, duplicado_info=existente)
 
 @web_bp.route('/checklists/<int:chk_id>')
 @roles_required('admin','user')

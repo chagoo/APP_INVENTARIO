@@ -2,8 +2,20 @@
 {% block title %}{{ 'Editar' if modo=='editar' else 'Nuevo' }} Checklist | {{ super() }}{% endblock %}
 {% block content %}
 <h3>Checklist Operación Diaria - {{ 'Editar' if modo=='editar' else 'Nuevo' }}</h3>
+{% if duplicado_info %}
+  <div class="alert alert-warning" role="alert">
+    Ya existe un checklist para la fecha <strong>{{ duplicado_info.fecha }}</strong>
+    creado por <strong>{{ duplicado_info.usuario.username if duplicado_info.usuario else '-' }}</strong>
+    a las <strong>{{ duplicado_info.created_at|dt_mx('%Y-%m-%d %H:%M') }}</strong>.
+    <a class="alert-link" href="{{ url_for('web.checklist_ver', chk_id=duplicado_info.id) }}" target="_blank">Ver existente</a>.
+    Si realmente necesitas otro, marca la casilla para confirmar y guardarlo de todas formas.
+  </div>
+{% endif %}
 <form method="post" novalidate enctype="multipart/form-data">
   {{ form.hidden_tag() }}
+  {% if duplicado_info %}
+    <input type="hidden" name="force" id="force" value="0">
+  {% endif %}
   <div class="row mb-3">
     <div class="col-md-3">{{ form.fecha.label(class='form-label') }} {{ form.fecha(class='form-control') }}</div>
     <div class="col-md-9">{{ form.comentarios.label(class='form-label') }} {{ form.comentarios(class='form-control', rows=2) }}</div>
@@ -56,4 +68,24 @@
   </div>
   <div class="text-end">{{ form.submit(class='btn btn-primary', value=('Actualizar' if modo=='editar' else 'Guardar')) }}</div>
 </form>
+{% if duplicado_info %}
+{% block scripts %}
+  {{ super() }}
+  <script>
+    // Si hay duplicado, pedir confirmación explícita
+    (function(){
+      const form = document.querySelector('form');
+      if(!form) return;
+      form.addEventListener('submit', function(ev){
+        const f = document.getElementById('force');
+        if(f && f.value !== '1'){
+          const ok = confirm('Ya existe un checklist para esta fecha. ¿Crear otro de todas formas?');
+          if(ok){ f.value = '1'; }
+          else { ev.preventDefault(); }
+        }
+      });
+    })();
+  </script>
+{% endblock %}
+{% endif %}
 {% endblock %}
