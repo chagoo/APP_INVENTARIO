@@ -28,7 +28,7 @@
   <table>
     <thead>
       <tr>
-        <th>Servicio</th><th>Responsable</th><th>Hora</th><th>Imagen</th><th>Estado</th><th>Operador</th><th>Observación</th>
+  <th>Servicio</th><th>Responsable</th><th>Hora</th><th>Imagen</th><th>Estado</th><th>Operador</th><th>Observación</th><th>Ejecutor</th>
       </tr>
     </thead>
     <tbody>
@@ -42,9 +42,10 @@
             <img class="thumb" src="{{ url_for('static', filename='actividades/' ~ it.imagen_ref) }}" alt="img">
           {% else %}-{% endif %}
         </td>
-        <td>{{ it.estado }}</td>
-        <td>{{ it.operador or '-' }}</td>
-        <td>{{ it.observacion or '' }}</td>
+  <td>{{ it.estado }}</td>
+  <td>{{ it.operador or '-' }}</td>
+  <td>{{ it.observacion or '' }}</td>
+  <td>{{ it.ejecutor or '-' }}</td>
       </tr>
       {% endfor %}
     </tbody>

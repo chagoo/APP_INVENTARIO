@@ -177,6 +177,7 @@ class OperationChecklistItem(db.Model):
     operador = db.Column(db.String(200))  # correo del operador que ejecuta la tarea
     observacion = db.Column(db.Text)
     imagen_ref = db.Column(db.String(255))
+    ejecutor = db.Column(db.String(200))  # Nuevo: quién resolverá / da seguimiento
 
     def to_dict(self):
         return {
@@ -187,6 +188,7 @@ class OperationChecklistItem(db.Model):
             'operador': self.operador,
             'observacion': self.observacion,
             'imagen_ref': self.imagen_ref,
+            'ejecutor': self.ejecutor,
         }
 
 

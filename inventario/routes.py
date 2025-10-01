@@ -646,6 +646,7 @@ def _build_checklist_form(fecha=None):
     for entry in form.items.entries:
         try:
             entry.form.operador.choices = choices
+            entry.form.ejecutor.choices = choices
         except Exception:
             pass
     if fecha:
@@ -703,6 +704,7 @@ def checklist_nuevo():
                 hora_objetivo=entry.form.hora_objetivo.data,
                 estado=entry.form.estado.data,
                 operador=(entry.form.operador.data or None),
+                ejecutor=(entry.form.ejecutor.data or None),
                 observacion=entry.form.observacion.data,
                 imagen_ref=img_filename
             )
@@ -782,8 +784,10 @@ def _build_checklist_edit_form(chk: OperationChecklist):
             entry.form.hora_objetivo.data = it.hora_objetivo
             entry.form.estado.data = it.estado
             entry.form.operador.choices = choices
+            entry.form.ejecutor.choices = choices
             try:
                 entry.form.operador.data = it.operador or (default_email if default_email in {v for v,_ in choices} else '')
+                entry.form.ejecutor.data = it.ejecutor or ''
             except Exception:
                 pass
             entry.form.observacion.data = it.observacion
@@ -793,6 +797,7 @@ def _build_checklist_edit_form(chk: OperationChecklist):
         for entry in form.items.entries:
             try:
                 entry.form.operador.choices = choices
+                entry.form.ejecutor.choices = choices
             except Exception:
                 pass
     # Detectar actividades nuevas activas que no están en el checklist
@@ -812,9 +817,11 @@ def _build_checklist_edit_form(chk: OperationChecklist):
             entry.form.estado.data = 'Pendiente'
             entry.form.observacion.data = ''
             entry.form.operador.choices = choices
+            entry.form.ejecutor.choices = choices
             # autoselect solo en GET
             if default_email and default_email in {v for v,_ in choices}:
                 entry.form.operador.data = default_email
+            # ejecutor se deja vacío por defecto
             entry.form._idx.data = str(base_idx + added)
             added += 1
             existing_services.add(key)
@@ -850,6 +857,7 @@ def checklist_editar(chk_id):
             if entry.form.estado.data:
                 model_item.estado = entry.form.estado.data
             model_item.operador = (entry.form.operador.data or None)
+            model_item.ejecutor = (entry.form.ejecutor.data or None)
             model_item.observacion = entry.form.observacion.data
             upload = entry.form.image_file.data
             if upload and getattr(upload, 'filename', None):
@@ -880,6 +888,7 @@ def checklist_editar(chk_id):
                 hora_objetivo=entry.form.hora_objetivo.data,
                 estado=entry.form.estado.data or 'Pendiente',
                 operador=(entry.form.operador.data or None),
+                ejecutor=(entry.form.ejecutor.data or None),
                 observacion=entry.form.observacion.data,
             )
             upload = entry.form.image_file.data

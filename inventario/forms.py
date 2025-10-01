@@ -77,6 +77,7 @@ class OperationChecklistItemForm(FlaskForm):
     estado = SelectField('Estado', choices=CHECKLIST_ESTADO_CHOICES)
     # operador se llenará como email seleccionado del catálogo
     operador = SelectField('Operador', choices=[], validators=[Optional()])
+    ejecutor = SelectField('Ejecutor', choices=[], validators=[Optional()])
     observacion = TextAreaField('Observación', validators=[Optional(), Length(max=500)])
     image_file = FileField('Img')
     # hidden para mantener orden
