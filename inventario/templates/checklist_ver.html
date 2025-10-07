@@ -17,7 +17,7 @@
 {% if chk.comentarios %}<div class="alert alert-info py-2"><strong>Comentarios:</strong> {{ chk.comentarios }}</div>{% endif %}
 <div class="table-responsive">
   <table class="table table-bordered table-sm align-middle">
-  <thead class="table-light"><tr><th>Servicio</th><th>Responsable</th><th>Hora</th><th>Imagen</th><th style="width:8%">Estado</th><th style="width:12%">Operador</th><th>Observación</th><th style="width:12%">Ejecutor</th></tr></thead>
+  <thead class="table-light"><tr><th>Servicio</th><th>Responsable</th><th>Hora</th><th>Imagen</th><th style="width:8%">Estado</th><th style="width:12%">Operador</th><th>Observación</th><th style="width:12%">Responsable solución</th></tr></thead>
     <tbody>
     {% for it in chk.items %}
       <tr class="{% if it.estado=='Alerta' %}table-danger{% elif it.estado=='OK' %}table-success{% endif %}">
